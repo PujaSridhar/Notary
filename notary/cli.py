@@ -71,6 +71,17 @@ def learn(failure: str = "", run_id: str = "") -> None:
 
 
 @app.command()
+def refine(failure: str = "", run_id: str = "", rounds: int = 2) -> None:
+    """Propose a lesson, test it on TRAIN only, revise from its new train mistakes, then save the best draft."""
+    from .proposer import failure_clusters, latest_run_id, refine_on_train
+
+    run_id = run_id or latest_run_id()
+    failure = failure or failure_clusters(run_id)[0]["_id"]
+    cand, history = refine_on_train(run_id, failure, rounds)
+    _print({"candidate_id": cand["_id"], "text": cand["text"], "drafts": history})
+
+
+@app.command()
 def add(text: str, untrusted: bool = False, target: str = "") -> None:
     """Insert a candidate by hand (created_by=manual_attack). Always disclosed in the demo."""
     from .proposer import add_manual

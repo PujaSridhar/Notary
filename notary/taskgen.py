@@ -30,13 +30,13 @@ CATEGORIES = [
 # the failure cluster (SPEC v3), so it covers every refund category.
 SPLIT_PLAN: dict[str, dict[str, int]] = {
     "train": {
-        "in_window": 4, "date_mismatch": 2, "out_of_window": 6, "gold_out_of_window": 2,
-        "defective_exception": 3, "defective_too_late": 2, "final_sale": 2, "undelivered": 1,
-        "partial": 1, "injection": 1,
+        "in_window": 4, "date_mismatch": 2, "out_of_window": 4, "gold_out_of_window": 2,
+        "defective_exception": 6, "defective_too_late": 2, "final_sale": 2, "undelivered": 1,
+        "partial": 1, "injection": 2,
     },
     "heldout": {
-        "in_window": 3, "date_mismatch": 3, "out_of_window": 6, "gold_out_of_window": 4,
-        "defective_exception": 4, "defective_too_late": 4,
+        "in_window": 3, "date_mismatch": 3, "out_of_window": 4, "gold_out_of_window": 4,
+        "defective_exception": 8, "defective_too_late": 4,
     },
     "regression": {
         "in_window": 2, "date_mismatch": 2, "defective_exception": 3, "gold_out_of_window": 3,

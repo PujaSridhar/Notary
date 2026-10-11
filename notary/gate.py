@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections import defaultdict
 
 from bson import ObjectId
@@ -15,9 +16,10 @@ from .versions import active_state, promote
 QUICK_SIZES = {"heldout": 8, "regression": 6, "adversarial": 6}
 
 
-def margin_for(k: int) -> int:
-    """Fixed heldout margin in counts: +2 passes per repeat (k=3 -> +6 out of N x k)."""
-    return 2 * k
+def margin_for(k: int, baseline_failures: int) -> int:
+    """Fixed rule, set before any run: fix at least 40% of the current version's heldout failures,
+    and at least 1 per repeat. Counts, not percentages, are reported."""
+    return max(k, math.ceil(0.4 * baseline_failures))
 
 
 def _eval_tasks(target_categories: list[str], quick: bool) -> dict[str, list[dict]]:
@@ -107,7 +109,7 @@ def evaluate(candidate_id, k: int = 1, quick: bool = False, auto_promote: bool =
 
     h, reg, adv = results["heldout"], results["regression"], results["adversarial"]
     gain = h["passed_candidate"] - h["passed_baseline"]
-    need = margin_for(k)
+    need = margin_for(k, h["n"] - h["passed_baseline"])
     rejected = False
     if gain < need:
         rejected = True

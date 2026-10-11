@@ -58,7 +58,7 @@ def proposer_model() -> str:
     """The proposer can use a stronger model than the agent; the agent stays cheap and fast."""
     if os.environ.get("PROPOSER_MODEL"):
         return os.environ["PROPOSER_MODEL"]
-    return "claude-sonnet-5-5" if provider() == "anthropic" else "gpt-4.1"
+    return "claude-sonnet-5-5" if provider() == "anthropic" else "gpt-5.5"
 
 
 def complete(system: str, user: str, temperature: float = 0.0, max_tokens: int = 1200) -> str:
@@ -70,9 +70,13 @@ def complete(system: str, user: str, temperature: float = 0.0, max_tokens: int =
             system=system, messages=[{"role": "user", "content": user}])
         return "".join(b.text for b in resp.content if b.type == "text")
     import openai
+    model = proposer_model()
+    # GPT-5 / o-series reasoning models take no temperature and count reasoning in completion tokens.
+    reasoning = model.startswith(("gpt-5", "o3", "o4"))
+    extra = {"max_completion_tokens": 8000} if reasoning else {"temperature": temperature, "max_tokens": max_tokens}
     resp = openai.OpenAI().chat.completions.create(
-        model=proposer_model(), temperature=temperature, max_tokens=max_tokens,
-        messages=[{"role": "system", "content": system}, {"role": "user", "content": user}])
+        model=model, messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+        **extra)
     return resp.choices[0].message.content or ""
 
 
