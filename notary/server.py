@@ -205,9 +205,20 @@ async def tunnel_guard(request: Request, call_next):
         return JSONResponse({"error": "not available over the public tunnel"}, status_code=403)
     if request.url.path.startswith("/v1/"):
         token = os.environ.get("NOTARY_VOICE_TOKEN", "")
-        if not token or request.headers.get("x-notary-token") != token:
+        auth_header = request.headers.get("authorization", "")
+        bearer_token = auth_header.removeprefix("Bearer ").strip() if auth_header.startswith("Bearer ") else ""
+        header_token = request.headers.get("x-notary-token", "")
+        if not token or (header_token != token and bearer_token != token):
             return JSONResponse({"error": "unauthorized"}, status_code=401)
     return await call_next(request)
+
+
+def _extract_content(content) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return " ".join(part.get("text", "") for part in content if isinstance(part, dict) and part.get("text"))
+    return str(content or "")
 
 
 def _voice_conversation_id(messages: list[dict]) -> str:
@@ -217,7 +228,12 @@ def _voice_conversation_id(messages: list[dict]) -> str:
 
 
 def _voice_turn(messages: list[dict]) -> str:
-    turns = [m for m in messages if m.get("role") in ("user", "assistant") and isinstance(m.get("content"), str)]
+    turns = []
+    for m in messages:
+        if m.get("role") in ("user", "assistant"):
+            c = _extract_content(m.get("content"))
+            if c:
+                turns.append({"role": m["role"], "content": c})
     latest = next((m["content"] for m in reversed(turns) if m["role"] == "user"), "")
     history = "\n".join(f"{'customer' if m['role'] == 'user' else 'agent'}: {m['content']}" for m in turns[:-1])
     prompt = (f"(Phone call. Conversation so far:\n{history}\n)\nCustomer now says: {latest}\n"
@@ -237,9 +253,10 @@ def _voice_turn(messages: list[dict]) -> str:
     return reply
 
 
-def _sse(text: str, model: str) -> str:
+def _sse(text: str, model: str, finish_reason: str | None = None) -> str:
+    delta = {"content": text} if text else {}
     chunk = {"id": "chatcmpl-notary", "object": "chat.completion.chunk", "created": int(time.time()),
-             "model": model, "choices": [{"index": 0, "delta": {"content": text}, "finish_reason": None}]}
+             "model": model, "choices": [{"index": 0, "delta": delta, "finish_reason": finish_reason}]}
     return f"data: {_json.dumps(chunk)}\n\n"
 
 
@@ -249,16 +266,50 @@ async def voice_llm(request: Request):
     body = await request.json()
     model = body.get("model", "notary")
     messages = body.get("messages", [])
-    latest = next((m.get("content") or "" for m in reversed(messages) if m.get("role") == "user"), "")
+    stream_requested = body.get("stream", True)
 
-    async def stream():
-        if any(ch.isdigit() for ch in str(latest)):
-            yield _sse("One moment, let me check that order... ", model)  # buffer words mask lookup latency
+    if not stream_requested:
         try:
             reply = await asyncio.wait_for(run_in_threadpool(_voice_turn, messages), timeout=25)
-        except Exception:
+        except Exception as e:
+            print(f"voice_llm error: {e}", flush=True)
             reply = "Sorry, I'm having trouble checking that right now. Could you say the order number again?"
-        yield _sse(reply, model)
+        return {
+            "id": "chatcmpl-notary",
+            "object": "chat.completion",
+            "created": int(time.time()),
+            "model": model,
+            "choices": [{
+                "index": 0,
+                "message": {"role": "assistant", "content": reply},
+                "finish_reason": "stop"
+            }],
+            "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        }
+
+    latest = next((_extract_content(m.get("content")) for m in reversed(messages) if m.get("role") == "user"), "")
+
+    async def stream():
+        # Immediate first chunk to satisfy TTFB and start OpenAI SSE stream
+        first_chunk = {
+            "id": "chatcmpl-notary",
+            "object": "chat.completion.chunk",
+            "created": int(time.time()),
+            "model": model,
+            "choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": None}],
+        }
+        yield f"data: {_json.dumps(first_chunk)}\n\n"
+
+        if any(ch.isdigit() for ch in str(latest)):
+            yield _sse("One moment, let me check that order... ", model, finish_reason=None)
+        try:
+            reply = await asyncio.wait_for(run_in_threadpool(_voice_turn, messages), timeout=25)
+        except Exception as e:
+            print(f"voice_llm stream error: {e}", flush=True)
+            reply = "Sorry, I'm having trouble checking that right now. Could you say the order number again?"
+        if reply:
+            yield _sse(reply, model, finish_reason=None)
+        yield _sse("", model, finish_reason="stop")
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(stream(), media_type="text/event-stream")
