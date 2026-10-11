@@ -50,8 +50,9 @@ def _call_tool(name: str, args: dict) -> dict:
         oid = str(args.get("order_id", "")).strip()
         doc = d.orders.find_one({"_id": oid})
         if not doc and oid:
-            clean = oid.upper().lstrip("A")
-            doc = d.orders.find_one({"_id": oid.upper()}) or d.orders.find_one({"_id": f"A{clean}"})
+            # Speech-to-text variants: "a10013", "A 10013", "A-10013", "10013", "order 10013"
+            digits = "".join(ch for ch in oid if ch.isdigit())
+            doc = d.orders.find_one({"_id": oid.upper()}) or (digits and d.orders.find_one({"_id": f"A{digits}"}))
         return doc or {"error": "order not found"}
     if name == "get_customer":
         doc = d.customers.find_one({"_id": args.get("customer_id")})

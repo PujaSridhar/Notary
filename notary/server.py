@@ -235,6 +235,9 @@ def _voice_turn(messages: list[dict]) -> str:
             if c:
                 turns.append({"role": m["role"], "content": c})
     latest = next((m["content"] for m in reversed(turns) if m["role"] == "user"), "")
+    if not any(ch.isalnum() for ch in latest):
+        # Silence or filler ("...") from speech-to-text: answer briefly, no model call, nothing recorded.
+        return "I'm still here. Whenever you're ready, tell me your order number."
     history = "\n".join(f"{'customer' if m['role'] == 'user' else 'agent'}: {m['content']}" for m in turns[:-1])
     prompt = (f"(Phone call. Conversation so far:\n{history}\n)\nCustomer now says: {latest}\n"
               "If you need an order number, ask for it in one short sentence.") if history else latest
