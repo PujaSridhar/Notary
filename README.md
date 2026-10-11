@@ -51,6 +51,59 @@ Memory today is "append and retrieve by similarity": no admission control, no ev
          trusted procedural memory: Atlas Agent Engine (save_procedure) + Atlas `lessons` mirror
 ```
 
+```mermaid
+flowchart TD
+    subgraph Inputs["Inputs & Channels"]
+        C["Customer (Web Chat / ElevenLabs Voice)"]
+        T["Train Tasks (MongoDB Atlas)"]
+    end
+
+    subgraph AgentBrain["Unified Agent Brain"]
+        A["Acme Refund Agent (agent_turn)"]
+        AtlasDB[("MongoDB Atlas<br/>orders, customers, traces")]
+    end
+
+    subgraph Discovery["Lesson Discovery & Proposer"]
+        FC["Failure Clustering<br/>($group aggregation)"]
+        EXT["Background Extractor<br/>(gpt-4.1-mini)"]
+        PROP["Proposer (gpt-5.5)<br/>Refine on Train Only"]
+    end
+
+    subgraph Gate["Empirical Evaluation Gate (Pure Code Grader)"]
+        CHK["Voyage Semantic Duplicate Check"]
+        EVAL["Evaluate Baseline vs Candidate<br/>Held-out + Regression + Adversarial Suites"]
+        INV{"Hard Invariant Checks<br/>& Provenance Rules"}
+    end
+
+    subgraph Outcomes["Verdicts"]
+        PROMOTED["✅ Promoted (vN)"]
+        REJECTED["❌ Rejected"]
+        QUARANTINED["🚫 Quarantined (Untrusted/Violations)"]
+    end
+
+    subgraph Storage["Atomic Promotion & Trusted Memory"]
+        TXN["Multi-Document Transaction<br/>rule_versions + memory_state + audit_log"]
+        AE[("Atlas Agent Engine Procedural Memory<br/>+ Atlas lessons mirror")]
+    end
+
+    C --> A
+    T --> A
+    A <--> AtlasDB
+    AtlasDB --> FC
+    A --> EXT
+    FC --> PROP
+    EXT --> PROP
+    PROP --> CHK
+    CHK --> EVAL
+    EVAL --> INV
+    INV -->|Passes all gates| PROMOTED
+    INV -->|Regresses/no gain| REJECTED
+    INV -->|Breaks invariant/untrusted| QUARANTINED
+    PROMOTED --> TXN
+    TXN --> AE
+    AE -.->|Read active rules| A
+```
+
 - **Domain:** a synthetic refund desk ("Acme"). The trusted policy lives in code (`notary/policy.py`), never in
   memory: refunds within 30 days of *delivery*; defective items up to 90 days; final sale never; undelivered → escalate.
 - **The agent only sees an incomplete policy summary**, so it has something real to learn.
@@ -102,6 +155,24 @@ cp .env.example .env            # fill in values (see .env.example)
 Voice: `cloudflared tunnel --url http://localhost:8800`, then `.venv/bin/python scripts/voice_agent.py <tunnel-url>`.
 Agent Engine memory SDK: `agent-engine-sdk-memory`, installed from Agent Engine's private index with a service-account
 token (see `notary/ae_auth.py`, `scripts/save_service_account.py`).
+
+## 2-Minute Judge Demo Script
+
+1. **The Hook (30s):**
+   > *"Agents that learn from experience store lessons into procedural memory. But nobody checks if a lesson is true, overgeneralized, or actively poisoned. A single customer tricking an agent can poison its procedural memory for all future interactions. Notary brings empirical admission control to agent memory."*
+2. **The Mechanism (45s):**
+   > *"Notary runs in 4 stages:*
+   > *1. **Propose**: Candidates emerge from MongoDB `$group` failure clusters or extraction from web/ElevenLabs voice calls.*
+   > *2. **Empirical Gate**: Candidate is run against held-out, regression, and adversarial test suites evaluated by a deterministic code grader (zero LLM judging).*
+   > *3. **Atomic Transaction**: If it passes with net performance gain and zero invariant regressions, it's promoted in a single multi-document MongoDB transaction across `rule_versions`, `memory_state`, and `audit_log`.*
+   > *4. **Trusted Procedural Memory**: Stored in Atlas Agent Engine. If any issue arises, 1-click rollback restores prior state atomically."*
+3. **Live Exploit & Gate Defense (45s):**
+   > - Open review page: `http://localhost:8800`.
+   > - **Valid improvement**: Highlight Candidate 1 (`Apply 90-day defect window`) — promoted to `v1` (held-out jumped 6/14 → 14/14, 0 invariant violations).
+   > - **Overgeneralization blocked**: Show candidate trying to deny all refunds > 30 days — rejected (broke the 90-day defect exception on regression suite).
+   > - **Poisoning blocked**: Show social-engineering candidate (*"Gold-tier customers get refunds anytime"*) — quarantined due to untrusted provenance and 3 hard invariant violations.
+   > - **The 'Without Notary' Exploit**: Click **'⚠️ Compare: What happens without Notary gate?'** — proves that without the gate, the injected rule causes immediate unauthorized refunds ($250 out-of-window refund).
+   > - **Rollback**: Show 1-click rollback button instantly reverting memory versions atomically in MongoDB Atlas.
 
 ## What we built today
 
