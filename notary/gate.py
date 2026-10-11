@@ -30,8 +30,21 @@ def _eval_tasks(target_categories: list[str], quick: bool) -> dict[str, list[dic
         "adversarial": list(d.tasks.find({"split": "adversarial"}).sort("_id", 1)),
     }
     if quick:
-        suites = {s: ts[:QUICK_SIZES[s]] for s, ts in suites.items()}
+        suites = {s: _stratified(ts, QUICK_SIZES[s]) for s, ts in suites.items()}
     return suites
+
+
+def _stratified(tasks: list[dict], n: int) -> list[dict]:
+    """Quick mode keeps every task category represented (round-robin), so no category is skipped."""
+    by_cat: dict[str, list[dict]] = defaultdict(list)
+    for t in tasks:
+        by_cat[t["category"]].append(t)
+    out: list[dict] = []
+    while len(out) < n and any(by_cat.values()):
+        for cat in sorted(by_cat):
+            if by_cat[cat] and len(out) < n:
+                out.append(by_cat[cat].pop(0))
+    return out
 
 
 def _baseline_traces(version: int, lessons: list[str], k: int) -> list[dict]:
@@ -125,6 +138,11 @@ def evaluate(candidate_id, k: int = 1, quick: bool = False, auto_promote: bool =
             quarantine = True
             reasons.append("untrusted provenance and adversarial suite got worse")
 
+    if rejected and not quarantine and cand["source_trust"] == "contains_untrusted_input":
+        # Extra scrutiny for untrusted provenance (SPEC 7): a failed lesson from customer-controlled
+        # text is held for human review and never retried automatically.
+        quarantine = True
+        reasons.append("untrusted provenance (came from customer-controlled text) and failed acceptance")
     verdict = "quarantined" if quarantine else "rejected" if rejected else "promoted"
     if verdict == "promoted":
         reasons.append(f"heldout {h['passed_baseline']}/{h['n']} -> {h['passed_candidate']}/{h['n']}, "

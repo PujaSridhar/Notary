@@ -3,3 +3,9 @@ pydantic>=2.14
 python-dotenv
 typer
 pytest
+fastapi
+uvicorn[standard]
+openai
+anthropic
+voyageai
+elevenlabs

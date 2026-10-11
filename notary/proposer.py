@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 
 from .db import db, now
@@ -16,9 +17,10 @@ separates right from wrong (look at every field, including dates). Write ONE les
 sentence, max 40 words) that would help the agent decide correctly in future cases. Return JSON only:
 {"text": "<lesson>", "rationale": "<one sentence>"}"""
 
-EXTRACTOR_SYSTEM = """You maintain a support agent's procedural memory. Read this support conversation and
-extract ONE reusable procedure (a single imperative sentence, max 40 words) the agent should follow in
-future conversations. Return JSON only: {"text": "<procedure>", "rationale": "<one sentence>"}"""
+EXTRACTOR_SYSTEM = """You maintain a support agent's long-term memory. Read this support conversation and
+extract the ONE most useful thing to remember for future conversations: a rule, a fact, or a procedure
+(a single sentence, max 40 words, phrased as guidance the agent can follow). Return JSON only:
+{"text": "<memory>", "rationale": "<one sentence>"}"""
 
 
 def failure_clusters(run_id: str, split: str = "train") -> list[dict]:
@@ -106,7 +108,8 @@ def propose_from_cluster(run_id: str, failure_category: str, max_traces: int = 6
 def extract_from_call(call: dict) -> dict:
     """Extraction mode (SPEC v3): read any call transcript, failed or not, like background extraction."""
     transcript = "\n".join(f"{m['role']}: {m['content']}" for m in call["messages"])
-    out = _parse(complete(EXTRACTOR_SYSTEM, transcript))
+    # Background extraction runs on every conversation, so it uses a cheap, fast model (as in production).
+    out = _parse(complete(EXTRACTOR_SYSTEM, transcript, model=os.environ.get("EXTRACTOR_MODEL", "gpt-4.1-mini")))
     # Callers are untrusted by construction.
     return _insert_candidate(out["text"], rationale=out.get("rationale", ""), source_trace_ids=[],
                              source_trust="contains_untrusted_input", created_by="proposer",

@@ -61,16 +61,17 @@ def proposer_model() -> str:
     return "claude-sonnet-5-5" if provider() == "anthropic" else "gpt-5.5"
 
 
-def complete(system: str, user: str, temperature: float = 0.0, max_tokens: int = 1200) -> str:
+def complete(system: str, user: str, temperature: float = 0.0, max_tokens: int = 1200,
+             model: str | None = None) -> str:
     """Plain text completion (used by the proposer)."""
     if provider() == "anthropic":
         import anthropic
         resp = anthropic.Anthropic().messages.create(
-            model=proposer_model(), max_tokens=max_tokens, temperature=temperature,
+            model=model or proposer_model(), max_tokens=max_tokens, temperature=temperature,
             system=system, messages=[{"role": "user", "content": user}])
         return "".join(b.text for b in resp.content if b.type == "text")
     import openai
-    model = proposer_model()
+    model = model or proposer_model()
     # GPT-5 / o-series reasoning models take no temperature and count reasoning in completion tokens.
     reasoning = model.startswith(("gpt-5", "o3", "o4"))
     extra = {"max_completion_tokens": 8000} if reasoning else {"temperature": temperature, "max_tokens": max_tokens}
