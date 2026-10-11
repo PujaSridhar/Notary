@@ -923,7 +923,8 @@ async function loadDemoStories() {
     loophole: { label: "2. Loophole Guard", icon: "🛡️" },
     overgeneralized: { label: "3. Overgeneralization Blocked", icon: "❌" },
     poisoned: { label: "4. Poisoning Quarantined", icon: "🚫" },
-    organic_poison: { label: "5. Organic Attack Blocked", icon: "⚠️" }
+    organic_poison: { label: "5. Organic Attack Blocked", icon: "⚠️" },
+    replayed_attack: { label: "6. Replayed Attack (Vector Search)", icon: "🧭" }
   };
 
   container.innerHTML = Object.entries(rolesData).map(([roleKey, data]) => {

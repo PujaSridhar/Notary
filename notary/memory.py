@@ -11,6 +11,7 @@ from .db import db, now
 
 EMBED_MODEL = os.environ.get("VOYAGE_MODEL", "voyage-4-lite")
 DUPLICATE_THRESHOLD = float(os.environ.get("NOTARY_DUP_THRESHOLD", "0.92"))
+KNOWN_ATTACK_THRESHOLD = float(os.environ.get("NOTARY_KNOWN_ATTACK_THRESHOLD", "0.90"))
 
 
 def embed(texts: list[str]) -> list[list[float]]:
@@ -30,6 +31,21 @@ def cosine(a: list[float], b: list[float]) -> float:
     return dot / (math.sqrt(sum(x * x for x in a)) * math.sqrt(sum(y * y for y in b)) or 1.0)
 
 
+def vector_nearest(vec: list[float], flt: dict) -> tuple[float, dict] | None:
+    """Atlas Vector Search ($vectorSearch) over candidate embeddings. Returns (cosine, doc), (0, None) if no
+    match, or None if the index is unavailable so callers can fall back."""
+    try:
+        rows = list(db().candidates.aggregate([
+            {"$vectorSearch": {"index": "candidate_vectors", "path": "embedding", "queryVector": vec,
+                               "numCandidates": 100, "limit": 1, "filter": flt}},
+            {"$project": {"text": 1, "status": 1, "score": {"$meta": "vectorSearchScore"}}}]))
+    except Exception:
+        return None
+    if not rows:
+        return 0.0, None
+    return 2 * rows[0]["score"] - 1, rows[0]  # Atlas cosine score is (1 + cos) / 2
+
+
 class AtlasVoyageStore:
     """Fallback store: a `lessons` collection in the Atlas Sandbox with Voyage embeddings."""
 
@@ -43,13 +59,24 @@ class AtlasVoyageStore:
         return str(candidate["_id"])
 
     def nearest_active(self, text: str, active_ids: list) -> tuple[float, dict | None]:
-        """Pre-gate duplicate check: similarity of a candidate to the closest active lesson."""
-        active = list(db().lessons.find({"_id": {"$in": active_ids}}))
-        if not active:
+        """Pre-gate duplicate check: cosine similarity to the closest lesson in the active version."""
+        if not active_ids:
             return 0.0, None
         vec = embed([text])[0]
+        hit = vector_nearest(vec, {"_id": {"$in": list(active_ids)}})
+        if hit is not None:
+            return hit
+        active = list(db().lessons.find({"_id": {"$in": active_ids}}))  # fallback: index not ready
+        if not active:
+            return 0.0, None
         best = max(active, key=lambda l: cosine(vec, l["embedding"]))
         return cosine(vec, best["embedding"]), best
+
+    def nearest_quarantined(self, candidate: dict) -> tuple[float, dict | None]:
+        """Known-attack check: closest previously quarantined lesson (excluding this candidate)."""
+        vec = candidate.get("embedding") or embed([candidate["text"]])[0]
+        hit = vector_nearest(vec, {"status": "quarantined", "_id": {"$ne": candidate["_id"]}})
+        return hit if hit is not None else (0.0, None)
 
 
 AGENT_USER = "acme-refund-agent"  # one agent identity; all lessons live in its procedural memory

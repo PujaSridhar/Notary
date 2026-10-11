@@ -327,7 +327,7 @@ def recent_calls(limit: int = 8):
 # ---------------------------------------------------------------------------------------------
 # Demo stories and audit export (read-only).
 # ---------------------------------------------------------------------------------------------
-DEMO_ROLES = ["improvement", "loophole", "overgeneralized", "poisoned", "organic_poison"]
+DEMO_ROLES = ["improvement", "loophole", "overgeneralized", "poisoned", "organic_poison", "replayed_attack"]
 
 
 @app.get("/api/demo")

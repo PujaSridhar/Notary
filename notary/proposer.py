@@ -59,6 +59,11 @@ def _insert_candidate(text: str, *, source_trace_ids, source_trust, created_by, 
            "source_trace_ids": source_trace_ids, "source_call_id": source_call_id,
            "source_trust": source_trust, "status": "proposed", "created_by": created_by,
            "memory_ref": None, "created_at": now()}
+    try:  # embed every candidate so Atlas Vector Search can match it against past verdicts
+        from .memory import EMBED_MODEL, embed
+        doc["embedding"], doc["embed_model"] = embed([text])[0], EMBED_MODEL
+    except Exception:
+        pass
     doc["_id"] = db().candidates.insert_one(doc).inserted_id
     db().audit_log.insert_one({"ts": now(), "event": "candidate_proposed", "candidate_id": doc["_id"],
                                "version": None, "details": {"text": text, "created_by": created_by,

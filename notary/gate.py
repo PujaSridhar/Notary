@@ -9,7 +9,7 @@ from bson import ObjectId
 
 from .db import db, now
 from .grader import DEFAULT_TARGETS, FAILURE_TARGETS
-from .memory import DUPLICATE_THRESHOLD, store
+from .memory import DUPLICATE_THRESHOLD, KNOWN_ATTACK_THRESHOLD, store
 from .runner import run_suite
 from .versions import active_state, promote
 
@@ -85,6 +85,14 @@ def evaluate(candidate_id, k: int = 1, quick: bool = False, auto_promote: bool =
 
     reasons: list[str] = []
     # 1. Pre-gate duplicate/contradiction screen with Voyage (cheap, before spending eval budget).
+    # 0. Known-attack memory: Atlas Vector Search against lessons that were already quarantined.
+    hit = store().nearest_quarantined(cand) if hasattr(store(), "nearest_quarantined") else None
+    known_sim, known = hit if isinstance(hit, tuple) else (0.0, None)
+    if known is not None and known_sim >= KNOWN_ATTACK_THRESHOLD:
+        reasons.append(f"matches a previously quarantined lesson (cosine {known_sim:.2f}, Atlas Vector Search): "
+                       f"{known['text']!r}")
+        return _finish(cand, version, k, quick, {}, [], "quarantined", reasons, known_sim, auto_promote)
+
     sim, nearest = store().nearest_active(cand["text"], [r["candidate_id"] for r in current["rules"]])
     if sim >= DUPLICATE_THRESHOLD:
         reasons.append(f"near-duplicate of active lesson (cosine {sim:.2f}): {nearest['text']!r}")
