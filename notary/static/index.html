@@ -156,6 +156,58 @@
     margin-bottom: 2px;
   }
 
+  /* Guided Demo Stories Bar */
+  .demo-stories-bar {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--line);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .demo-stories-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .story-chips {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .story-chip {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--ink);
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .story-chip:hover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .story-chip.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+  @media (prefers-color-scheme: dark) {
+    .story-chip.active { color: #08130d; }
+  }
+
   main {
     display: grid;
     grid-template-columns: minmax(360px, 460px) 1fr;
@@ -352,7 +404,7 @@
     padding: 16px;
     margin-bottom: 16px;
     background: var(--panel);
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
     box-shadow: var(--shadow-sm);
   }
   .card:hover {
@@ -361,6 +413,12 @@
   .card.status-promoted { border-left: 4px solid var(--ok); }
   .card.status-quarantined { border-left: 4px solid var(--warn); }
   .card.status-rejected { border-left: 4px solid var(--bad); }
+
+  .card.story-highlight {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent), var(--shadow-md);
+    transform: translateY(-2px);
+  }
 
   .card .top {
     display: flex;
@@ -403,11 +461,56 @@
     border-radius: 4px;
     border: 1px solid var(--line);
   }
+  .prov-tag.story-tag {
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-color: var(--accent);
+    font-weight: 600;
+  }
   .prov .untrusted {
     color: var(--bad);
     background: var(--bad-soft);
     border-color: var(--bad-border);
     font-weight: 600;
+  }
+
+  /* Procedural Memory Diff View */
+  .diff-box {
+    margin-top: 12px;
+    background: var(--panel-subtle);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+  .diff-title {
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 6px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .diff-line {
+    padding: 2px 4px;
+    border-radius: 3px;
+    word-break: break-word;
+  }
+  .diff-add {
+    background: var(--ok-soft);
+    color: var(--ok);
+  }
+  .diff-del {
+    background: var(--bad-soft);
+    color: var(--bad);
+  }
+  .diff-context {
+    color: var(--muted);
   }
 
   /* Suite evaluation table */
@@ -468,10 +571,10 @@
   }
   .ver {
     display: flex;
-    gap: 12px;
-    align-items: center;
+    flex-direction: column;
+    gap: 6px;
     font-size: 13px;
-    padding: 8px 12px;
+    padding: 10px 12px;
     border-radius: var(--radius-sm);
     border: 1px solid var(--line);
     background: var(--panel-subtle);
@@ -479,6 +582,11 @@
   .ver.active {
     border-color: var(--accent);
     background: var(--accent-soft);
+  }
+  .ver-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
   }
   .ver .v {
     font-family: var(--mono);
@@ -492,6 +600,12 @@
     flex: 1;
     color: var(--ink);
     font-size: 12.5px;
+  }
+  .ver-diff-summary {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    padding-top: 4px;
+    border-top: 1px dashed var(--line);
   }
 
   /* Audit Log */
@@ -570,6 +684,13 @@
       </div>
     </div>
   </div>
+
+  <div class="demo-stories-bar">
+    <span class="demo-stories-label">🎬 Guided Demo Stories:</span>
+    <div class="story-chips" id="storyChips">
+      <span style="font-size:12px;color:var(--muted)">Loading scenarios…</span>
+    </div>
+  </div>
 </header>
 
 <main>
@@ -602,7 +723,10 @@
     </section>
 
     <section>
-      <h2>Append-Only Audit Log</h2>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <h2 style="margin:0">Append-Only Audit Log</h2>
+        <button class="secondary" id="exportAudit" style="padding:4px 10px;font-size:12px;">Audit export (JSON)</button>
+      </div>
       <p class="sub">Every promotion, quarantine, rejection, and rollback is permanently recorded in the same transaction.</p>
       <div class="audit" id="audit"></div>
     </section>
@@ -618,6 +742,7 @@
 <script>
 const $ = (id) => document.getElementById(id);
 let conv = null, cust = "C0000";
+let globalState = null, demoData = null;
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
 async function api(path, opts = {}) {
@@ -659,6 +784,37 @@ function badge(status) {
   return `<span class="badge ${cls}">${icon}${esc(st.replace("_", " "))}</span>`;
 }
 
+/* Feature 2: Procedural Memory Diff View computed from /api/state versions[].rules */
+function getMemoryDiffHtml(candidate, versions, activeVersion) {
+  if (!versions || !versions.length) return "";
+
+  const candText = candidate.text;
+  const isPromoted = candidate.status === "promoted";
+
+  if (isPromoted) {
+    // Find the version where this candidate was promoted
+    const promotedVer = versions.find(v => v.promoted_candidate_id === candidate._id || (v.rules || []).some(r => r.candidate_id === candidate._id));
+    if (promotedVer) {
+      const parentVer = versions.find(v => v._id === promotedVer.parent_version);
+      const parentRules = parentVer && parentVer.rules ? parentVer.rules.map(r => r.text) : [];
+      return `<div class="diff-box">
+        <div class="diff-title">Procedural Memory Diff: v${promotedVer.parent_version ?? "base"} ➔ v${promotedVer._id}</div>
+        ${parentRules.length ? parentRules.map(r => `<div class="diff-line diff-context">  ${esc(r)}</div>`).join("") : `<div class="diff-line diff-context">  (base prompt only)</div>`}
+        <div class="diff-line diff-add">+ “${esc(candText)}”</div>
+      </div>`;
+    }
+  }
+
+  // Not promoted (rejected, quarantined, or proposed): show proposed diff against current active version rules
+  const activeVerObj = versions.find(v => v._id === activeVersion);
+  const currentRules = activeVerObj && activeVerObj.rules ? activeVerObj.rules.map(r => r.text) : [];
+  return `<div class="diff-box">
+    <div class="diff-title">Proposed Memory Diff (if applied to active v${activeVersion}):</div>
+    ${currentRules.length ? currentRules.map(r => `<div class="diff-line diff-context">  ${esc(r)}</div>`).join("") : `<div class="diff-line diff-context">  (base prompt only)</div>`}
+    <div class="diff-line diff-add">+ “${esc(candText)}”</div>
+  </div>`;
+}
+
 function renderCand(c) {
   const ev = c.eval;
   let table = "";
@@ -696,6 +852,10 @@ function renderCand(c) {
       ? "extracted from customer dialog"
       : "proposer (refined on train failures)";
 
+  const roleTag = c.demo_role
+    ? `<span class="prov-tag story-tag">role: ${esc(c.demo_role.replace("_", " "))}</span>`
+    : "";
+
   const ung = c.status !== "promoted"
     ? `<div class="row" style="margin-top:14px">
          <button class="secondary danger" data-ungated="${c._id}">⚠️ Compare: What happens without Notary gate?</button>
@@ -703,24 +863,90 @@ function renderCand(c) {
        <div id="ung-${c._id}"></div>`
     : "";
 
+  const diffHtml = globalState && globalState.versions ? getMemoryDiffHtml(c, globalState.versions, globalState.active_version) : "";
   const cardClass = `card status-${c.status || "other"}`;
 
-  return `<div class="${cardClass}">
+  return `<div class="${cardClass}" id="cand-${c._id}">
     <div class="top">
       ${badge(c.status)}
       <div style="flex:1">
         <div class="lesson-box">“${esc(c.text)}”</div>
         <div class="prov">
           ${trustTag}
+          ${roleTag}
           <span class="prov-tag">source: ${esc(byText)}</span>
           <span class="prov-tag">k=${ev ? ev.k : "1"}${ev && ev.quick ? " · quick" : ""}</span>
         </div>
       </div>
     </div>
+    ${diffHtml}
     ${table}
     ${reasons}
     ${ung}
   </div>`;
+}
+
+/* Feature 1: Guided Demo Stories Bar (loads dynamically from /api/demo or falls back to /api/state) */
+async function loadDemoStories() {
+  const container = $("storyChips");
+  let rolesData = null;
+
+  try {
+    const d = await api("/api/demo");
+    if (d && d.roles && Object.keys(d.roles).length) {
+      demoData = d;
+      rolesData = d.roles;
+    }
+  } catch (err) {
+    // Graceful fallback to inspecting /api/state candidates
+  }
+
+  if (!rolesData && globalState && globalState.candidates) {
+    // Build roles dynamically from state candidates if /api/demo is absent
+    rolesData = {};
+    for (const c of globalState.candidates) {
+      if (c.demo_role) rolesData[c.demo_role] = { candidate: c, eval: c.eval };
+    }
+  }
+
+  if (!rolesData || !Object.keys(rolesData).length) {
+    container.innerHTML = `<span style="font-size:12px;color:var(--muted)">Explore candidates below</span>`;
+    return;
+  }
+
+  const roleMeta = {
+    improvement: { label: "1. Legitimate Improvement", icon: "✅" },
+    loophole: { label: "2. Loophole Guard", icon: "🛡️" },
+    overgeneralized: { label: "3. Overgeneralization Blocked", icon: "❌" },
+    poisoned: { label: "4. Poisoning Quarantined", icon: "🚫" },
+    organic_poison: { label: "5. Organic Attack Blocked", icon: "⚠️" }
+  };
+
+  container.innerHTML = Object.entries(rolesData).map(([roleKey, data]) => {
+    const meta = roleMeta[roleKey] || { label: roleKey.replace("_", " "), icon: "📌" };
+    const cand = data.candidate;
+    const cid = cand ? cand._id : "";
+    return `<button class="story-chip" data-role="${esc(roleKey)}" data-cid="${esc(cid)}" title="Status: ${esc(cand ? cand.status : '')}">
+      <span>${meta.icon}</span> ${esc(meta.label)}
+    </button>`;
+  }).join("");
+
+  container.onclick = (e) => {
+    const btn = e.target.closest(".story-chip");
+    if (!btn) return;
+    document.querySelectorAll(".story-chip").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+
+    const cid = btn.dataset.cid;
+    if (cid) {
+      document.querySelectorAll(".card").forEach(c => c.classList.remove("story-highlight"));
+      const targetCard = $(`cand-${cid}`);
+      if (targetCard) {
+        targetCard.classList.add("story-highlight");
+        targetCard.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+  };
 }
 
 async function refreshCalls() {
@@ -745,20 +971,100 @@ async function refreshCalls() {
 async function refresh() {
   refreshCalls();
   const s = await api("/api/state");
+  globalState = s;
+
   $("active").textContent = `active memory: v${s.active_version}`;
   $("cands").innerHTML = s.candidates.length ? s.candidates.map(renderCand).join("") : `<p class="sub">No candidates yet.</p>`;
+
+  // Version cards with inline version diff summary
   $("versions").innerHTML = s.versions.slice().reverse().map(v => {
-    const txt = v.rules.length ? v.rules.map(r => r.text).join(" | ") : "base policy only (empty memory)";
+    const parentVer = s.versions.find(p => p._id === v.parent_version);
+    const parentRules = parentVer && parentVer.rules ? parentVer.rules.map(r => r.text) : [];
+    const curRules = v.rules ? v.rules.map(r => r.text) : [];
+
+    let diffText = "";
+    if (v._id === 0) {
+      diffText = `<span class="diff-context">base prompt policy only (empty procedural memory)</span>`;
+    } else {
+      const added = curRules.filter(r => !parentRules.includes(r));
+      diffText = added.length
+        ? added.map(r => `<span class="diff-add">+ “${esc(r)}”</span>`).join("<br>")
+        : `<span class="diff-context">no rules changed</span>`;
+    }
+
     const isActive = v._id === s.active_version;
     const btn = isActive ? `<span style="font-size:12px;color:var(--accent);font-weight:600;">ACTIVE</span>` : `<button class="secondary" data-rollback="${v._id}">Rollback To This</button>`;
+
     return `<div class="ver ${isActive ? "active" : ""}">
-      <span class="v">v${v._id}</span>
-      <span class="txt">${esc(txt)}</span>
-      ${btn}
+      <div class="ver-header">
+        <span class="v">v${v._id}</span>
+        <span class="txt">${esc(curRules.length ? curRules.join(" | ") : "base policy only")}</span>
+        ${btn}
+      </div>
+      <div class="ver-diff-summary">
+        ${diffText}
+      </div>
     </div>`;
   }).join("");
+
   $("audit").innerHTML = s.audit.map(a => `<div><span>${esc(a.ts.slice(11, 19))}</span> <strong>${esc(a.event)}</strong> <span>${a.version != null ? "v" + a.version : ""}</span></div>`).join("");
+
+  loadDemoStories();
 }
+
+/* Feature 3: Audit export (JSON) handler with graceful fallback */
+$("exportAudit").onclick = async () => {
+  const btn = $("exportAudit");
+  const origText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Exporting…";
+
+  try {
+    // Attempt /api/audit/export first
+    const res = await fetch("/api/audit/export");
+    if (res.ok) {
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "notary-audit-export.json";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      btn.textContent = origText;
+      btn.disabled = false;
+      return;
+    }
+  } catch (e) {
+    // Fall back to building export from /api/state
+  }
+
+  try {
+    const s = await api("/api/state");
+    const fallbackData = {
+      exported_at: new Date().toISOString(),
+      active_version: s.active_version,
+      versions: s.versions,
+      candidates: s.candidates,
+      audit_log: s.audit
+    };
+    const blob = new Blob([JSON.stringify(fallbackData, null, 2)], { type: "application/json" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "notary-audit-export.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    alert("Export failed: " + err.message);
+  }
+
+  btn.textContent = origText;
+  btn.disabled = false;
+};
 
 document.addEventListener("click", async (e) => {
   const rb = e.target.dataset.rollback, ug = e.target.dataset.ungated, ex = e.target.dataset.extract;
