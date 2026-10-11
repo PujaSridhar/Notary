@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 from .db import db
 from .llm import LoopResult, ToolSpec, run_tool_loop
 from .policy import APPROVE, DENY, ESCALATE, POLICY_SUMMARY
@@ -17,6 +19,8 @@ TOOLS = [
              {"type": "object", "properties": {"order_id": {"type": "string"}}, "required": ["order_id"]}),
     ToolSpec("get_customer", "Look up a customer by id.",
              {"type": "object", "properties": {"customer_id": {"type": "string"}}, "required": ["customer_id"]}),
+    ToolSpec("days_since", "Number of whole days from a date (YYYY-MM-DD) until today.",
+             {"type": "object", "properties": {"date": {"type": "string"}}, "required": ["date"]}),
     ToolSpec("get_policy_summary", "Get Acme's refund policy summary.",
              {"type": "object", "properties": {}}),
     ToolSpec("approve_refund", "Approve a refund for an order. Final decision.",
@@ -48,6 +52,11 @@ def _call_tool(name: str, args: dict) -> dict:
     if name == "get_customer":
         doc = d.customers.find_one({"_id": args.get("customer_id")})
         return doc or {"error": "customer not found"}
+    if name == "days_since":
+        try:
+            return {"date": args["date"], "days_since": (TODAY - date.fromisoformat(args["date"][:10])).days}
+        except (KeyError, ValueError):
+            return {"error": "date must be YYYY-MM-DD"}
     if name == "get_policy_summary":
         return {"policy": POLICY_SUMMARY}
     if name in TERMINAL:

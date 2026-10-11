@@ -54,17 +54,24 @@ def run_tool_loop(system: str, user: str, tools: list[ToolSpec],
     return _openai_loop(system, user, tools, call_tool, terminal, max_steps, temperature)
 
 
+def proposer_model() -> str:
+    """The proposer can use a stronger model than the agent; the agent stays cheap and fast."""
+    if os.environ.get("PROPOSER_MODEL"):
+        return os.environ["PROPOSER_MODEL"]
+    return "claude-sonnet-5-5" if provider() == "anthropic" else "gpt-4.1"
+
+
 def complete(system: str, user: str, temperature: float = 0.0, max_tokens: int = 1200) -> str:
     """Plain text completion (used by the proposer)."""
     if provider() == "anthropic":
         import anthropic
         resp = anthropic.Anthropic().messages.create(
-            model=model_name(), max_tokens=max_tokens, temperature=temperature,
+            model=proposer_model(), max_tokens=max_tokens, temperature=temperature,
             system=system, messages=[{"role": "user", "content": user}])
         return "".join(b.text for b in resp.content if b.type == "text")
     import openai
     resp = openai.OpenAI().chat.completions.create(
-        model=model_name(), temperature=temperature, max_tokens=max_tokens,
+        model=proposer_model(), temperature=temperature, max_tokens=max_tokens,
         messages=[{"role": "system", "content": system}, {"role": "user", "content": user}])
     return resp.choices[0].message.content or ""
 
