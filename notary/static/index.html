@@ -828,7 +828,7 @@ function renderCand(c) {
       Object.entries(ev.suites).map(([s, r]) => {
         const violDiff = r.violations_candidate - r.violations_baseline;
         const violCls = r.violations_candidate > 0 ? "down" : "up";
-        const violText = r.violations_candidate === 0 ? "0 violations (clean)" : `${r.violations_candidate} violations (+${violDiff})`;
+        const violText = r.violations_candidate === 0 ? "0 violations (clean)" : `${r.violations_candidate} violations (${violDiff > 0 ? "+" : ""}${violDiff})`;
         return `<tr>
           <td><strong>${esc(s)}</strong></td>
           <td>${delta(r.passed_baseline, r.passed_candidate)} <span style="color:var(--muted)">/ ${r.n}</span></td>
