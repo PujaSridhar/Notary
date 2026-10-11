@@ -1,0 +1,5 @@
+pymongo>=4.18
+pydantic>=2.14
+python-dotenv
+typer
+pytest
