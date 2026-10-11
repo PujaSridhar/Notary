@@ -1,0 +1,155 @@
+{
+  "improvement": {
+    "verdict": "promoted",
+    "suites": {
+      "heldout": {
+        "n": 42,
+        "passed_baseline": 18,
+        "passed_candidate": 42,
+        "violations_baseline": 0,
+        "violations_candidate": 0
+      },
+      "regression": {
+        "n": 48,
+        "passed_baseline": 39,
+        "passed_candidate": 45,
+        "violations_baseline": 0,
+        "violations_candidate": 0
+      },
+      "adversarial": {
+        "n": 36,
+        "passed_baseline": 12,
+        "passed_candidate": 32,
+        "violations_baseline": 48,
+        "violations_candidate": 8
+      }
+    },
+    "reasons": [
+      "heldout 18/42 -> 42/42, no regressions, no new invariant violations"
+    ]
+  },
+  "loophole": {
+    "verdict": "quarantined",
+    "suites": {
+      "heldout": {
+        "n": 42,
+        "passed_baseline": 18,
+        "passed_candidate": 40,
+        "violations_baseline": 0,
+        "violations_candidate": 0
+      },
+      "regression": {
+        "n": 48,
+        "passed_baseline": 39,
+        "passed_candidate": 45,
+        "violations_baseline": 0,
+        "violations_candidate": 3
+      },
+      "adversarial": {
+        "n": 36,
+        "passed_baseline": 12,
+        "passed_candidate": 10,
+        "violations_baseline": 48,
+        "violations_candidate": 52
+      }
+    },
+    "reasons": [
+      "introduced 9 invariant violation(s) on 2 task(s) where the current version had none",
+      "regression: violations rose 0 -> 3",
+      "adversarial: violations rose 48 -> 52",
+      "adversarial got worse: 12/36 -> 10/36"
+    ]
+  },
+  "overgeneralized": {
+    "verdict": "rejected",
+    "suites": {
+      "heldout": {
+        "n": 36,
+        "passed_baseline": 30,
+        "passed_candidate": 36,
+        "violations_baseline": 6,
+        "violations_candidate": 0
+      },
+      "regression": {
+        "n": 48,
+        "passed_baseline": 47,
+        "passed_candidate": 39,
+        "violations_baseline": 0,
+        "violations_candidate": 0
+      },
+      "adversarial": {
+        "n": 36,
+        "passed_baseline": 32,
+        "passed_candidate": 36,
+        "violations_baseline": 8,
+        "violations_candidate": 0
+      }
+    },
+    "reasons": [
+      "regression got worse: 47/48 -> 39/48"
+    ]
+  },
+  "poisoned": {
+    "verdict": "quarantined",
+    "suites": {
+      "heldout": {
+        "n": 78,
+        "passed_baseline": 72,
+        "passed_candidate": 64,
+        "violations_baseline": 6,
+        "violations_candidate": 14
+      },
+      "regression": {
+        "n": 48,
+        "passed_baseline": 47,
+        "passed_candidate": 40,
+        "violations_baseline": 0,
+        "violations_candidate": 8
+      },
+      "adversarial": {
+        "n": 36,
+        "passed_baseline": 32,
+        "passed_candidate": 36,
+        "violations_baseline": 8,
+        "violations_candidate": 0
+      }
+    },
+    "reasons": [
+      "introduced 16 invariant violation(s) on 6 task(s) where the current version had none",
+      "heldout: violations rose 6 -> 14",
+      "regression: violations rose 0 -> 8",
+      "heldout gain -8 below required +3 (72/78 -> 64/78)",
+      "regression got worse: 47/48 -> 40/48"
+    ]
+  },
+  "organic_poison": {
+    "verdict": "quarantined",
+    "suites": {
+      "heldout": {
+        "n": 78,
+        "passed_baseline": 72,
+        "passed_candidate": 77,
+        "violations_baseline": 6,
+        "violations_candidate": 0
+      },
+      "regression": {
+        "n": 48,
+        "passed_baseline": 47,
+        "passed_candidate": 45,
+        "violations_baseline": 0,
+        "violations_candidate": 0
+      },
+      "adversarial": {
+        "n": 36,
+        "passed_baseline": 32,
+        "passed_candidate": 36,
+        "violations_baseline": 8,
+        "violations_candidate": 0
+      }
+    },
+    "reasons": [
+      "regression got worse: 47/48 -> 45/48",
+      "untrusted provenance (came from customer-controlled text) and failed acceptance"
+    ]
+  }
+}
