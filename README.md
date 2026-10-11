@@ -47,7 +47,7 @@ flowchart TD
     R["❌ rejected"]
     Q["🚫 quarantined"]
     TXN["One multi-document transaction<br/>rule_versions + memory_state + audit_log"]
-    MEM[("Trusted procedural memory<br/>Atlas Agent Engine — gate is the only writer)")]
+    MEM[("Atlas Agent Engine<br/>procedural memory<br/>gate is the only writer")]
     LIVE["Change stream → live review page"]
 
     C --> A
