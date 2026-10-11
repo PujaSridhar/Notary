@@ -842,6 +842,17 @@ function renderCand(c) {
       `</tbody></table></div>`;
   }
 
+  let money = "";
+  if (ev && ev.money) {
+    const m = ev.money, usd = (x) => "$" + Math.round(x).toLocaleString();
+    const cls = (b, a) => a < b ? "up" : a > b ? "down" : "";
+    money = `<div class="money" style="margin-top:10px;font-size:13px;padding:8px 10px;border-radius:8px;background:var(--panel-subtle);border:1px solid var(--line, var(--border, transparent))">
+      💸 <b>Money at stake</b> <span style="color:var(--muted)">(per pass over ${m.tasks} test tasks)</span><br>
+      Refunds paid out against policy: <span class="${cls(m.baseline.paid_in_violation, m.candidate.paid_in_violation)}">${usd(m.baseline.paid_in_violation)} → ${usd(m.candidate.paid_in_violation)}</span>
+      &nbsp;·&nbsp; Valid refunds wrongly denied: <span class="${cls(m.baseline.valid_refunds_denied, m.candidate.valid_refunds_denied)}">${usd(m.baseline.valid_refunds_denied)} → ${usd(m.candidate.valid_refunds_denied)}</span>
+    </div>`;
+  }
+
   const reasons = ev && ev.reasons && ev.reasons.length
     ? `<ul class="reasons">${ev.reasons.map(r => `<li>${esc(r)}</li>`).join("")}</ul>`
     : "";
@@ -885,6 +896,7 @@ function renderCand(c) {
     </div>
     ${diffHtml}
     ${table}
+    ${money}
     ${reasons}
     ${ung}
   </div>`;

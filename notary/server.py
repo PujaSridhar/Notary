@@ -41,6 +41,40 @@ def page():
     return FileResponse(STATIC / "index.html")
 
 
+def _latest_per_run(run_id: str) -> dict:
+    """Latest trace per (task, repeat) in a run, so a re-run never double-counts."""
+    out = {}
+    for t in db().traces.find({"run_id": run_id}, {"task_id": 1, "rep": 1, "final": 1, "invariants_violated": 1,
+                                                    "failure_category": 1, "created_at": 1}):
+        key = (t["task_id"], t.get("rep", 0))
+        if key not in out or t["created_at"] > out[key]["created_at"]:
+            out[key] = t
+    return out
+
+
+def money_impact(ev: dict | None) -> dict | None:
+    """Dollars behind the verdict, from the graded traces: refunds paid out in violation of policy, and valid
+    refunds wrongly denied to customers. Same tasks before and after; averaged per pass through the suites."""
+    if not ev or not ev.get("suites"):
+        return None
+    k, cid = ev.get("k", 1), ev["candidate_id"]
+    cand = _latest_per_run(f"cand-{cid}-k{k}{'-q' if ev.get('quick') else ''}")
+    base = _latest_per_run(f"base-v{ev['rules_baseline_version']}-k{k}")
+    keys = set(cand) & set(base)
+    if not keys:
+        return None
+    expected = {t["_id"]: t["expected"] for t in db().tasks.find({"_id": {"$in": list({tk for tk, _ in keys})}})}
+
+    def tally(traces):
+        paid = sum(float((t.get("final") or {}).get("amount") or 0) for key, t in traces.items() if key in keys
+                   and t.get("invariants_violated") and (t.get("final") or {}).get("decision") == "approve")
+        denied = sum(expected[key[0]]["max_amount"] for key, t in traces.items() if key in keys
+                     and t.get("failure_category") == "denied_valid_refund")
+        return {"paid_in_violation": round(paid / k, 2), "valid_refunds_denied": round(denied / k, 2)}
+
+    return {"baseline": tally(base), "candidate": tally(cand), "tasks": len(keys) // k, "per": "pass"}
+
+
 @app.get("/api/state")
 def state():
     d = db()
@@ -48,7 +82,10 @@ def state():
     versions = list(d.rule_versions.find().sort("_id", 1))
     cands = []
     for c in d.candidates.find().sort("created_at", -1):
-        ev = d.eval_runs.find_one({"candidate_id": c["_id"]}, sort=[("created_at", -1)])
+        ev = d.eval_runs.find_one({"candidate_id": c["_id"]}, sort=[("k", -1), ("created_at", -1)])
+        if ev is not None:
+            ev["money"] = money_impact(ev)
+        c.pop("embedding", None)
         cands.append({**c, "eval": ev})
     audit = list(d.audit_log.find().sort("ts", -1).limit(30))
     return _jsonable({"active_version": st["active_version"], "versions": versions,
@@ -340,6 +377,9 @@ def demo():
         if c is None:
             continue
         ev = d.eval_runs.find_one({"candidate_id": c["_id"]}, sort=[("k", -1), ("created_at", -1)])
+        if ev is not None:
+            ev["money"] = money_impact(ev)
+        c.pop("embedding", None)
         ungated = d.traces.count_documents({"run_id": f"ungated-{c['_id']}"})
         roles[role] = {"candidate": c, "eval": ev, "ungated_runs": ungated}
     st = d.memory_state.find_one({"_id": "state"})
