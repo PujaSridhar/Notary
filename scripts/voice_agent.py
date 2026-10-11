@@ -19,7 +19,7 @@ base = sys.argv[1].rstrip("/")
 # ElevenLabs appends /chat/completions to this base URL itself.
 custom_llm = {"url": f"{base}/v1", "model_id": "notary",
               "request_headers": {"X-Notary-Token": env["NOTARY_VOICE_TOKEN"]}}
-agent = {"first_message": "Hi, this is Acme refund support. How can I help you today?", "language": "en",
+agent = {"first_message": "Hi, this is Acme refund support. This call is recorded and transcribed. How can I help you today?", "language": "en",
          "prompt": {"prompt": "You are Acme's refund support agent. (Decisions are made by the Notary custom LLM.)",
                     "llm": "custom-llm", "custom_llm": custom_llm}}
 

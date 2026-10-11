@@ -651,8 +651,12 @@
       <h1>Notary</h1>
       <span class="tag">Empirical Admission Control for AI Agent Memory</span>
     </div>
-    <span class="active-badge" id="active">active memory: v–</span>
+    <div style="display:flex;gap:10px;align-items:center">
+      <span id="live" title="Live updates from a MongoDB change stream" style="font-size:12px;color:var(--muted);font-family:var(--mono)">○ connecting…</span>
+      <span class="active-badge" id="active">active memory: v–</span>
+    </div>
   </div>
+  <div id="toasts" style="position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;z-index:50;max-width:min(380px,calc(100vw - 32px))"></div>
 
   <div class="pipeline-bar">
     <div class="pipeline-step">
@@ -1152,7 +1156,36 @@ $("extract").onclick = async () => {
     $("input").focus();
   });
   refresh();
+  startLive();
 })();
+
+// Live updates: the server relays a MongoDB change stream (db.watch) on the governance collections.
+function toast(text) {
+  const el = document.createElement("div");
+  el.textContent = text;
+  el.style.cssText = "background:var(--panel);border:1px solid var(--accent);color:var(--ink);padding:8px 12px;border-radius:8px;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,.25)";
+  $("toasts").appendChild(el);
+  setTimeout(() => el.remove(), 5000);
+}
+function describe(ev) {
+  if (ev.coll === "audit_log" && ev.event) return `${ev.event.replace(/_/g, " ")}${ev.version != null ? " · v" + ev.version : ""}`;
+  if (ev.coll === "calls") return `${ev.channel === "voice" ? "Voice call" : "Chat"} updated`;
+  if (ev.coll === "memory_state") return `Active memory → v${ev.active_version}`;
+  return null;
+}
+let liveTimer = null;
+function startLive() {
+  const es = new EventSource("/api/events");
+  es.addEventListener("ready", () => { $("live").textContent = "● live · MongoDB change stream"; $("live").style.color = "var(--ok)"; });
+  es.onmessage = (m) => {
+    const ev = JSON.parse(m.data);
+    const msg = describe(ev);
+    if (msg) toast(msg);
+    clearTimeout(liveTimer);
+    liveTimer = setTimeout(refresh, 400);  // debounce bursts (a gate run writes several documents)
+  };
+  es.onerror = () => { $("live").textContent = "○ reconnecting…"; $("live").style.color = "var(--muted)"; };
+}
 </script>
 </body>
 </html>

@@ -137,7 +137,7 @@ gate is only as strong as its tests, which is why hard invariants and adversaria
 
 | Product | Role | Without it |
 |---|---|---|
-| **MongoDB Atlas (hackathon Sandbox, Cluster0)** | tasks, orders, traces, candidates, eval runs, rule versions, audit log; `$group` failure clustering; **multi-document transactions** for promote/rollback | no atomic promotion, no audit trail, no rollback |
+| **MongoDB Atlas (hackathon Sandbox, Cluster0)** | tasks, orders, traces, candidates, eval runs, rule versions, audit log; `$group` failure clustering; **multi-document transactions** for promote/rollback; **change streams** (`db.watch`) push every verdict, promotion, rollback and call to the page live | no atomic promotion, no audit trail, no rollback, no live view |
 | **Atlas Agent Engine** (standalone memory service, hosted) | trusted **procedural memory**. Background extraction is configured to *exclude* procedural (`agentengine/project-config.yaml`), so **Notary's gate is the only writer** (`save_procedure`); reads via `discover_procedures`, filtered by Notary's active version | "Agent Engine can extract and store procedures. Notary decides which ones are allowed to be trusted." |
 | **Voyage AI** (via Atlas model API) | embeddings for promoted lessons; pre-gate duplicate check before spending eval budget | duplicate/contradicting lessons waste eval runs |
 | **ElevenLabs Agents** | voice support line; caller speech is untrusted input and the realistic poisoning channel; uses Notary as its **custom LLM** so voice and gate share one brain | terminal-only demo, no realistic attack surface |
@@ -196,6 +196,16 @@ The design spec in [docs/SPEC.md](docs/SPEC.md) was written the night before and
 - Review page + customer chat + "write it without the gate" comparison (FastAPI)
 - Voice channel: OpenAI-compatible streaming endpoint used as ElevenLabs custom LLM, token auth, tunnel guard
 - Atlas Agent Engine procedural memory store (gate-only writer), with fail-safe fallback to Atlas
+- Live page updates from a MongoDB change stream (`/api/events`), guided demo stories, memory diff view, audit export
+
+## Deliberate deviations from the spec
+
+- **Held-out margin:** instead of a flat "+6 of N×k", a candidate must fix at least 40% of the current version's
+  held-out failures (minimum 1 per repeat). A flat margin is impossible when the baseline only fails a few tasks.
+- **Voice transcripts** are captured through Notary's own custom-LLM endpoint rather than ElevenLabs' signed
+  post-call webhook: one fewer public endpoint, same data.
+- **Agent Engine:** wired as the procedural memory store (gate-only writer), but the hosted memory server could not
+  start on hackathon day (it rejected the US-scoped Voyage key), so promotions fall back to the Atlas lesson store.
 
 ## Rules compliance
 

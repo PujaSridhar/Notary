@@ -362,3 +362,56 @@ def audit_export():
         "audit_log": list(d.audit_log.find().sort("ts", 1)),
     })
     return JSONResponse(body, headers={"Content-Disposition": 'attachment; filename="notary-audit-export.json"'})
+
+
+# ---------------------------------------------------------------------------------------------
+# Live updates: a MongoDB change stream on the governance collections, pushed to the page as SSE.
+# ---------------------------------------------------------------------------------------------
+WATCHED = ["audit_log", "calls", "candidates", "eval_runs", "memory_state"]
+
+
+def _summarize_change(change: dict) -> dict:
+    coll = change["ns"]["coll"]
+    doc = change.get("fullDocument") or {}
+    out = {"coll": coll, "op": change["operationType"]}
+    if coll == "audit_log":
+        out.update(event=doc.get("event"), version=doc.get("version"))
+    elif coll == "calls":
+        out.update(channel=doc.get("channel"), conversation_id=doc.get("conversation_id"))
+    elif coll == "candidates":
+        out.update(status=doc.get("status"), text=(doc.get("text") or "")[:80])
+    elif coll == "memory_state":
+        out.update(active_version=doc.get("active_version"))
+    elif coll == "eval_runs":
+        out.update(verdict=doc.get("verdict"))
+    return _jsonable(out)
+
+
+@app.get("/api/events")
+async def events(request: Request):
+    """Server-sent events driven by db.watch(): verdicts, promotions, rollbacks and calls appear live."""
+    pipeline = [{"$match": {"ns.coll": {"$in": WATCHED},
+                            "operationType": {"$in": ["insert", "update", "replace"]}}}]
+
+    def open_stream():
+        return db().watch(pipeline, full_document="updateLookup", max_await_time_ms=1000)
+
+    async def gen():
+        stream = await run_in_threadpool(open_stream)
+        try:
+            yield "event: ready\ndata: {}\n\n"
+            idle = 0
+            while not await request.is_disconnected():
+                change = await run_in_threadpool(stream.try_next)
+                if change is not None:
+                    idle = 0
+                    yield f"data: {_json.dumps(_summarize_change(change))}\n\n"
+                else:
+                    idle += 1
+                    if idle % 15 == 0:
+                        yield ": keep-alive\n\n"
+        finally:
+            await run_in_threadpool(stream.close)
+
+    return StreamingResponse(gen(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
