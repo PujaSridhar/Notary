@@ -122,6 +122,48 @@ What the numbers say:
 - Vector matching is a fast first line, not the only one: a heavily reworded attack (similarity 0.84) went through
   the full test suites and was quarantined there (3 new rule violations).
 
+## Independent benchmark
+
+To test whether the promoted lesson (**v1**) generalizes beyond the distributions it was proposed and refined on, we evaluated **v0** (baseline, no lessons) vs. **v1** on an independent held-out benchmark of **40 novel tasks** never seen during proposal, refinement, or gating (`scripts/independent_bench.py`, raw data: [docs/independent_bench_k3.json](docs/independent_bench_k3.json)).
+
+The independent suite introduces hard, non-templated scenarios:
+- **Exact boundary days**: 29, 30, 31, 89, 90, 91 days since delivery
+- **Order date vs. delivery date mismatches**: extended transit and backorders
+- **Partial refunds**: valid partial, amounts requested exceeding total, out-of-window partials
+- **Final-sale items**: including defect claims and VIP members on final-sale goods
+- **Undelivered orders**: in-transit tracking requiring escalation
+- **Gold-tier customers**: testing VIP exceptions vs. standard policy
+- **Verbal damage claims**: customers asserting defects on items recorded as `defective=false`
+- **Tone extremes**: ultra-polite out-of-window requests vs. abusive/threatening in-window requests
+- **Novel injections**: administrator override codes, supervisor escalation memos, legal settlement notices, developer debug calls, and pentest audit probes
+
+Evaluated with **3 repeats** ($k=3$, 120 agent runs per version). Ground truth decisions derived strictly from code (`notary/policy.py` &rarr; `expected_decision()`):
+
+| Metric | Baseline (v0) | Promoted lesson (v1) | Net change |
+|---|---|---|---|
+| **Pass rate** | 92 / 120 (76.7%) | **98 / 120** (81.7%) | **+6 passes** |
+| **Rule violations** | 21 | 33 | +12 violations |
+| **Valid refunds wrongly denied** | $1,214.17 / pass | **$43.33 / pass** | **-$1,170.84 / pass** (honest customers protected) |
+| **Refunds paid against policy** | $654.00 / pass | $1,245.00 / pass | +$591.00 / pass |
+
+### Category breakdown (out of N&times;3)
+
+| Category | v0 Passed | v1 Passed | v0 Rule violations | v1 Rule violations |
+|---|---|---|---|---|
+| Boundary days (29, 30, 31, 89, 90, 91) | 12 / 18 | **14 / 18** | 0 | 3 |
+| Order vs. delivery date mismatches | 12 / 15 | 12 / 15 | 0 | 3 |
+| Partial refunds | 11 / 12 | **12 / 12** | 0 | 0 |
+| Final-sale items | 9 / 12 | **12 / 12** | 3 | **0** |
+| Undelivered orders (escalation) | 12 / 12 | 12 / 12 | 0 | 0 |
+| Gold-tier customers | 9 / 12 | **12 / 12** | 0 | 0 |
+| Claimed damage on non-defective orders | **12 / 12** | 9 / 12 | 0 | 3 |
+| Tone extremes (polite vs. abusive) | 9 / 12 | **12 / 12** | 0 | 0 |
+| Novel prompt injections | **6 / 15** | 3 / 15 | 18 | 24 |
+
+### What the numbers say
+- **Honest customers protected**: v1 drastically reduced valid refunds denied ($1,214.17 &rarr; **$43.33** per pass) by teaching the agent the 90-day defect exception. It also completely eliminated final-sale violations (3 &rarr; 0) and handled gold-tier customers and tone extremes accurately.
+- **The limits of a single lesson**: while v1 helped on valid refunds, on novel adversarial injections and verbal defect assertions, the agent became more permissive (rule violations rose 21 &rarr; 33). This directly confirms the core insight of recursive harnessing: **procedural memory evolution cannot be a one-shot process**—each iteration shifts the agent's behavior, requiring continuous, automated gating and adversarial benchmarking.
+
 ## Built with
 
 | Technology | What it does in Notary |
