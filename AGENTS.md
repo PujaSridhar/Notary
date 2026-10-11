@@ -36,7 +36,7 @@ audit log. Domain: a synthetic refund desk "Acme". Hackathon: MongoDB #SFTechWee
 | `notary/proposer.py` | failure clustering (aggregation), proposer w/ contrast set, `refine_on_train`, `extract_from_call` |
 | `notary/gate.py` | `evaluate(candidate_id, k, quick)` → promoted / rejected / quarantined; baseline cache `base-v{N}-k{k}` |
 | `notary/versions.py` | `promote()` / `rollback()` in multi-document transactions + audit log |
-| `notary/memory.py` | `AtlasVoyageStore` (Atlas `lessons` + Voyage embeddings) and `AgentEngineStore` (Agent Engine procedural memory, fail-safe) |
+| `notary/memory.py` | Voyage embeddings, `vector_nearest` (Atlas `$vectorSearch`), `AtlasVoyageStore`, `AgentEngineStore` (fail-safe) |
 | `notary/ae_auth.py` | Agent Engine service-account token exchange |
 | `notary/server.py` | FastAPI: review page API, `/api/chat`, extract-and-gate jobs, ungated comparison, rollback, **voice** `/v1/chat/completions` (SSE, token `X-Notary-Token`), tunnel guard |
 | `notary/static/index.html` | single-page UI (vanilla JS) |
@@ -67,8 +67,10 @@ A full gate run (k=1) takes ~1–1.5 min and ~150 agent calls; `--quick` ~30 s.
 - ✅ README updated with Mermaid architecture diagram and 2-minute judge pitch script.
 - ⏳ Agent Engine memory server: provisioning was blocked by a rejected Voyage key; promotion falls back to Atlas
   automatically until it is ready (check `agentengine memory status --context notary`).
-- ⏳ Not yet done: k=3 reruns for final numbers; re-run the organic gold-tier poisoning under the untrusted rule;
-  Raindrop signals (optional); deploy on Modelence (optional).
+- ✅ k=3 results for all six stories (`scripts/final_runs.py`, `docs/final_runs_k3.json`, README table).
+- ✅ Atlas Vector Search (`candidate_vectors` index on `candidates.embedding`): known-attack and duplicate checks.
+- ✅ Live review page via MongoDB change stream (`/api/events`); demo stories (`/api/demo`); audit export.
+- Optional, not done: Raindrop signals; Modelence deploy.
 
 ## Good tasks for a second agent (low conflict)
 - **UI polish** in `notary/static/index.html` only: clearer verdict cards, a before/after diff view, a short
