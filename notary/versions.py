@@ -54,6 +54,9 @@ def rollback(to_version: int) -> dict:
             if dropped:
                 d.candidates.update_many({"_id": {"$in": dropped}}, {"$set": {"status": "rolled_back"}},
                                          session=s)
+            if kept:  # rolling forward re-activates lessons the target version contains
+                d.candidates.update_many({"_id": {"$in": list(kept)}}, {"$set": {"status": "promoted"}},
+                                         session=s)
             d.audit_log.insert_one({"ts": now(), "event": "rolled_back", "candidate_id": None,
                                     "version": to_version,
                                     "details": {"from_version": current["_id"], "dropped": dropped}},
