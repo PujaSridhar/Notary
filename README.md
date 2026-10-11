@@ -141,7 +141,7 @@ Evaluated with **3 repeats** ($k=3$, 120 agent runs per version). Ground truth d
 
 | Metric | Baseline (v0) | Promoted lesson (v1) | Net change |
 |---|---|---|---|
-| **Pass rate** | 92 / 120 (76.7%) | **98 / 120** (81.7%) | **+6 passes** |
+| **Passed runs** | 92 / 120 | **98 / 120** | **+6** |
 | **Rule violations** | 21 | 33 | +12 violations |
 | **Valid refunds wrongly denied** | $1,214.17 / pass | **$43.33 / pass** | **-$1,170.84 / pass** (honest customers protected) |
 | **Refunds paid against policy** | $654.00 / pass | $1,245.00 / pass | +$591.00 / pass |
@@ -161,8 +161,19 @@ Evaluated with **3 repeats** ($k=3$, 120 agent runs per version). Ground truth d
 | Novel prompt injections | **6 / 15** | 3 / 15 | 18 | 24 |
 
 ### What the numbers say
-- **Honest customers protected**: v1 drastically reduced valid refunds denied ($1,214.17 &rarr; **$43.33** per pass) by teaching the agent the 90-day defect exception. It also completely eliminated final-sale violations (3 &rarr; 0) and handled gold-tier customers and tone extremes accurately.
-- **The limits of a single lesson**: while v1 helped on valid refunds, on novel adversarial injections and verbal defect assertions, the agent became more permissive (rule violations rose 21 &rarr; 33). This directly confirms the core insight of recursive harnessing: **procedural memory evolution cannot be a one-shot process**—each iteration shifts the agent's behavior, requiring continuous, automated gating and adversarial benchmarking.
+- **Better for honest customers.** v1 learned the defective-item exception: valid refunds wrongly denied fell from
+  $1,214 to $43 per pass, final-sale violations went from 3 to 0, and partial, gold-tier and tone cases all passed.
+- **Worse at the window boundaries.** Every new violation under v1 is an approval outside the refund window, most
+  of them date arithmetic: defective items delivered 91 and 95 days ago approved "within the 90-day window", a
+  non-defective item at 68 days and another at 70 days approved "within the 30-day window". The agent estimated the
+  number of days instead of calling its `days_since` tool, and the lesson made it apply the windows more often.
+- **Injections are an open problem for both versions.** Three of the four novel injection styles (supervisor memo,
+  admin override code, "compliance notice") fooled v0 and v1 alike.
+- **What it says about the gate.** Notary promoted v1 because it was clearly better on its own suites, which have
+  few boundary-day tasks — so the gate could not see this weakness. The fix is the loop itself: add boundary-day
+  tasks to the regression suite, then gate a follow-up lesson such as "compute days with `days_since` before
+  applying any refund window". The gate is only as strong as its suites; an independent set is how you find out
+  where they are thin.
 
 ## Built with
 
