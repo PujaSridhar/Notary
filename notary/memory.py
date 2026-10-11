@@ -78,6 +78,12 @@ class AtlasVoyageStore:
         hit = vector_nearest(vec, {"status": "quarantined", "_id": {"$ne": candidate["_id"]}})
         return hit if hit is not None else (0.0, None)
 
+    def lessons_for(self, query: str, active_ids: list) -> list[str]:
+        if not active_ids:
+            return []
+        docs = list(db().lessons.find({"_id": {"$in": active_ids}}))
+        return [d["text"] for d in docs if d.get("text")]
+
 
 AGENT_USER = "acme-refund-agent"  # one agent identity; all lessons live in its procedural memory
 
@@ -91,7 +97,9 @@ class AgentEngineStore(AtlasVoyageStore):
         from agent_engine_sdk_memory import Memory, MemoryRequestContext
 
         from .ae_auth import access_token
-        return Memory(service_account_token=access_token()).bind(MemoryRequestContext(user_id=AGENT_USER))
+        project_id = os.environ.get("AGENT_ENGINE_PROJECT") or os.environ.get("AE_PROJECT_ID") or "6acbc0fe24b62b0067ef4657"
+        return Memory(service_account_token=access_token(), project_id=project_id).bind(
+            MemoryRequestContext(user_id=AGENT_USER))
 
     def write_lesson(self, candidate: dict) -> str:
         atlas_ref = super().write_lesson(candidate)  # Atlas mirror + embedding (always)
@@ -103,16 +111,22 @@ class AgentEngineStore(AtlasVoyageStore):
             return f"atlas:{atlas_ref} (agent engine unavailable)"
 
     def _write_agent_engine(self, candidate: dict) -> str:
-        res = self._mem().save_procedure(
-            procedure=f"notary-{candidate['_id']}",
-            description="Refund-desk lesson admitted by the Notary evaluation gate",
-            content=candidate["text"],
-            tags=["notary", "refund-desk"],
-            extraction_source="notary-gate",
-            metadata={"notary_candidate_id": str(candidate["_id"]),
-                      "source_trust": candidate["source_trust"], "admitted_by": "notary-gate"})
-        db().lessons.update_one({"_id": candidate["_id"]}, {"$set": {"agent_engine_result": str(res)[:500]}})
-        return f"agent-engine:notary-{candidate['_id']}"
+        proc_name = f"notary-{candidate['_id']}"
+        try:
+            res = self._mem().save_procedure(
+                procedure=proc_name,
+                description="Refund-desk lesson admitted by the Notary evaluation gate",
+                content=candidate["text"],
+                tags=["notary", "refund-desk"],
+                extraction_source="notary-gate",
+                metadata={"notary_candidate_id": str(candidate["_id"]),
+                          "source_trust": candidate["source_trust"], "admitted_by": "notary-gate"})
+            db().lessons.update_one({"_id": candidate["_id"]}, {"$set": {"agent_engine_result": str(res)[:500]}})
+        except Exception as e:
+            if "uniqueness constraint violated" in str(e) or "Duplicate document" in str(e):
+                return f"agent-engine:{proc_name}"
+            raise
+        return f"agent-engine:{proc_name}"
 
     def write_ungated(self, text: str, tag: str) -> str:
         """The naive path, for the comparison demo only: what unchecked extraction would store."""
@@ -123,14 +137,18 @@ class AgentEngineStore(AtlasVoyageStore):
 
     def lessons_for(self, query: str, active_ids: list) -> list[str]:
         """Agent read path: discover procedures in Agent Engine, then serve only those in the active version."""
-        wanted = {str(i) for i in active_ids}
-        hits = self._mem().discover_procedures(query, top_k=50, tags=["notary"])
-        out = []
-        for h in hits:
-            meta = h.get("metadata") or {}
-            if meta.get("notary_candidate_id") in wanted:
-                out.append(h.get("content") or h.get("text") or "")
-        return [t for t in out if t]
+        try:
+            wanted = {str(i) for i in active_ids}
+            hits = self._mem().discover_procedures(query, top_k=50)
+            out = []
+            for h in hits:
+                meta = h.get("metadata") or {}
+                tags = h.get("tags") or []
+                if ("notary" in tags or not tags) and meta.get("notary_candidate_id") in wanted:
+                    out.append(h.get("content") or h.get("text") or "")
+            return [t for t in out if t] or super().lessons_for(query, active_ids)
+        except Exception:
+            return super().lessons_for(query, active_ids)
 
 
 def agent_engine_enabled() -> bool:

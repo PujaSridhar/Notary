@@ -16,8 +16,20 @@ from .taskgen import TODAY, order_from_doc
 def active_lessons() -> tuple[int, list[str]]:
     d = db()
     state = d.memory_state.find_one({"_id": "state"}) or {"active_version": 0}
-    version = d.rule_versions.find_one({"_id": state["active_version"]}) or {"rules": []}
-    return state["active_version"], [r["text"] for r in version["rules"]]
+    ver_num = state["active_version"]
+    version = d.rule_versions.find_one({"_id": ver_num}) or {"rules": []}
+    fallback_texts = [r["text"] for r in version.get("rules", [])]
+    if not fallback_texts:
+        return ver_num, []
+    try:
+        from .memory import store
+        active_ids = [r["candidate_id"] for r in version.get("rules", [])]
+        lessons = store().lessons_for("refund", active_ids)
+        if lessons:
+            return ver_num, lessons
+    except Exception:
+        pass
+    return ver_num, fallback_texts
 
 
 def run_one(task: dict, lessons: list[str], run_id: str, rules_version, rep: int) -> dict:

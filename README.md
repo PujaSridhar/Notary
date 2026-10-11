@@ -186,9 +186,9 @@ and only with the access token; the review page, chat and rollback stay local.
 - **Provenance.** Anything extracted from a customer conversation is untrusted by construction — no classifier
   decides that.
 - **One brain.** Chat, voice and the test suites all call the same `agent_turn()` with the same active lessons.
-- **Agent Engine status.** Notary is wired as the only writer to Agent Engine procedural memory, but the hosted
-  memory server in our project hasn't started yet (it rejected our Voyage key), so promotions currently fall back
-  to the Atlas lesson store automatically.
+- **Agent Engine live.** Notary is wired as the only writer to Agent Engine procedural memory and
+  operates live against the hosted memory server. Promoted lessons are written via `save_procedure`, and active
+  lessons are discovered via `discover_procedures` (with automatic fallback to Atlas rule versions on error).
 - **Limits.** The benchmark is synthetic and small; passing it is evidence, not proof. Model outputs vary between
   runs, so reported numbers use 3 repeats. A bad lesson that happens to pass every suite could still be promoted —
   the gate is only as strong as its tests, which is why hard rules and adversarial suites exist. The agent still

@@ -65,8 +65,8 @@ A full gate run (k=1) takes ~1–1.5 min and ~150 agent calls; `--quick` ~30 s.
 - ✅ UI polished (`notary/static/index.html`) with visual pipeline banner, delta badges, and before/after comparisons.
 - ✅ Unit test suite expanded (`tests/test_gate_mock.py`) covering gate logic, margins, and atomic transactions.
 - ✅ README updated with Mermaid architecture diagram and 2-minute judge pitch script.
-- ⏳ Agent Engine memory server: provisioning was blocked by a rejected Voyage key; promotion falls back to Atlas
-  automatically until it is ready (check `agentengine memory status --context notary`).
+- ✅ Atlas Agent Engine procedural memory: verified live! Memory server is ready in project scope;
+  gate writes via save_procedure; active lessons read live via discover_procedures (with fallback to Atlas).
 - ✅ k=3 results for all six stories (`scripts/final_runs.py`, `docs/final_runs_k3.json`, README table).
 - ✅ Atlas Vector Search (`candidate_vectors` index on `candidates.embedding`): known-attack and duplicate checks.
 - ✅ Live review page via MongoDB change stream (`/api/events`); demo stories (`/api/demo`); audit export.
