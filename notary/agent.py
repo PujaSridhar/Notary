@@ -47,7 +47,11 @@ def system_prompt(lessons: list[str]) -> str:
 def _call_tool(name: str, args: dict) -> dict:
     d = db()
     if name == "get_order":
-        doc = d.orders.find_one({"_id": args.get("order_id")})
+        oid = str(args.get("order_id", "")).strip()
+        doc = d.orders.find_one({"_id": oid})
+        if not doc and oid:
+            clean = oid.upper().lstrip("A")
+            doc = d.orders.find_one({"_id": oid.upper()}) or d.orders.find_one({"_id": f"A{clean}"})
         return doc or {"error": "order not found"}
     if name == "get_customer":
         doc = d.customers.find_one({"_id": args.get("customer_id")})
