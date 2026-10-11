@@ -16,7 +16,8 @@ from dotenv import dotenv_values
 ENV = Path(__file__).resolve().parent.parent / ".env"
 env = dotenv_values(ENV)
 base = sys.argv[1].rstrip("/")
-custom_llm = {"url": f"{base}/v1/chat/completions", "model_id": "notary",
+# ElevenLabs appends /chat/completions to this base URL itself.
+custom_llm = {"url": f"{base}/v1", "model_id": "notary",
               "request_headers": {"X-Notary-Token": env["NOTARY_VOICE_TOKEN"]}}
 agent = {"first_message": "Hi, this is Acme refund support. How can I help you today?", "language": "en",
          "prompt": {"prompt": "You are Acme's refund support agent. (Decisions are made by the Notary custom LLM.)",

@@ -244,6 +244,7 @@ def _sse(text: str, model: str) -> str:
 
 
 @app.post("/v1/chat/completions")
+@app.post("/v1/chat/completions/chat/completions")  # tolerate a full URL configured in ElevenLabs
 async def voice_llm(request: Request):
     body = await request.json()
     model = body.get("model", "notary")
