@@ -140,13 +140,16 @@ class AgentEngineStore(AtlasVoyageStore):
         try:
             wanted = {str(i) for i in active_ids}
             hits = self._mem().discover_procedures(query, top_k=50)
-            out = []
+            found = {}
             for h in hits:
                 meta = h.get("metadata") or {}
                 tags = h.get("tags") or []
-                if ("notary" in tags or not tags) and meta.get("notary_candidate_id") in wanted:
-                    out.append(h.get("content") or h.get("text") or "")
-            return [t for t in out if t] or super().lessons_for(query, active_ids)
+                cid = meta.get("notary_candidate_id")
+                if ("notary" in tags or not tags) and cid in wanted and (h.get("content") or h.get("text")):
+                    found[cid] = h.get("content") or h.get("text")
+            if set(found) != wanted:  # never serve a partial memory: every active lesson or the Atlas copy
+                return super().lessons_for(query, active_ids)
+            return [found[str(i)] for i in active_ids]
         except Exception:
             return super().lessons_for(query, active_ids)
 

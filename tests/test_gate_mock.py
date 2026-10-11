@@ -314,6 +314,9 @@ def test_active_lessons_reads_from_store_with_fallback(mock_db):
         "rules": [{"candidate_id": cid, "text": "Atlas fallback rule text"}]
     }
 
+    from notary import runner
+    runner._LESSON_CACHE.clear()
+
     # Case 1: store().lessons_for returns procedure
     with patch("notary.memory.store") as mock_store:
         mock_store.return_value.lessons_for.return_value = ["Agent engine procedure text"]
@@ -322,8 +325,28 @@ def test_active_lessons_reads_from_store_with_fallback(mock_db):
         assert lessons == ["Agent engine procedure text"]
 
     # Case 2: store().lessons_for raises an exception, falls back safely to rule_versions text
+    runner._LESSON_CACHE.clear()
     with patch("notary.memory.store") as mock_store:
         mock_store.return_value.lessons_for.side_effect = RuntimeError("AE unavailable")
         v, lessons = active_lessons()
         assert v == 1
         assert lessons == ["Atlas fallback rule text"]
+
+
+@patch("notary.runner.db")
+def test_active_lessons_cache_is_per_version(mock_db):
+    """A cached read is reused for the same version, and a rollback (new version) reads again."""
+    from notary import runner
+    from notary.runner import active_lessons
+    runner._LESSON_CACHE.clear()
+    cid = ObjectId()
+    mock_db.return_value.memory_state.find_one.return_value = {"active_version": 1}
+    mock_db.return_value.rule_versions.find_one.return_value = {"_id": 1, "rules": [{"candidate_id": cid, "text": "t"}]}
+    with patch("notary.memory.store") as mock_store:
+        mock_store.return_value.lessons_for.return_value = ["from agent engine"]
+        active_lessons(); active_lessons()
+        assert mock_store.return_value.lessons_for.call_count == 1
+        mock_db.return_value.memory_state.find_one.return_value = {"active_version": 2}
+        mock_db.return_value.rule_versions.find_one.return_value = {"_id": 2, "rules": [{"candidate_id": cid, "text": "t"}]}
+        active_lessons()
+        assert mock_store.return_value.lessons_for.call_count == 2

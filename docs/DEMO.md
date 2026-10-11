@@ -7,7 +7,7 @@
    > *1. **Propose**: Candidates emerge from MongoDB `$group` failure clusters or extraction from web/ElevenLabs voice calls.*
    > *2. **Empirical Gate**: Candidate is run against held-out, regression, and adversarial test suites evaluated by a deterministic code grader (zero LLM judging).*
    > *3. **Atomic Transaction**: If it passes with net performance gain and zero invariant regressions, it's promoted in a single multi-document MongoDB transaction across `rule_versions`, `memory_state`, and `audit_log`.*
-   > *4. **Trusted Procedural Memory**: Written only by the gate: to an Atlas lesson store today, and wired to Atlas Agent Engine procedural memory (`save_procedure`), which activates once the hosted memory server is ready. 1-click rollback restores the prior version atomically."*
+   > *4. **Trusted Procedural Memory**: Written only by the gate into Atlas Agent Engine procedural memory (`save_procedure`); the agent reads its active lessons back through `discover_procedures`, filtered by the active version. 1-click rollback restores the prior version atomically."*
 3. **Live Exploit & Gate Defense (45s):**
    > - Open review page: `http://localhost:8800`.
    > - **Valid improvement**: Highlight Candidate 1 (`Apply 90-day defect window`) — promoted to `v1` (held-out 18/42 → 42/42 over 3 repeats, no new invariant violations).

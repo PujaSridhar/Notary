@@ -47,7 +47,7 @@ flowchart TD
     R["❌ rejected"]
     Q["🚫 quarantined"]
     TXN["One multi-document transaction<br/>rule_versions + memory_state + audit_log"]
-    MEM[("Trusted procedural memory<br/>(gate is the only writer)")]
+    MEM[("Trusted procedural memory<br/>Atlas Agent Engine — gate is the only writer)")]
     LIVE["Change stream → live review page"]
 
     C --> A
@@ -127,7 +127,7 @@ What the numbers say:
 | Technology | What it does in Notary |
 |---|---|
 | **MongoDB Atlas** | System of record for orders, customers, tasks, every agent trace, candidates, evaluations, rule versions and the audit log. **Aggregation pipelines** cluster failures. **Multi-document transactions** make promotion and rollback atomic. **Change streams** drive the live review page. **Atlas Vector Search** (`$vectorSearch`) powers the known-attack and duplicate checks. |
-| **Atlas Agent Engine** | Target store for trusted procedural memory. Background extraction is configured to skip procedural memory (`agentengine/project-config.yaml`), so Notary's gate is the only writer (`save_procedure`); reads go through `discover_procedures`, filtered by Notary's active version. |
+| **Atlas Agent Engine** | Live store for trusted procedural memory. Background extraction is configured to skip procedural memory (`agentengine/project-config.yaml`), so Notary's gate is the only writer (`save_procedure`); reads go through `discover_procedures`, filtered by Notary's active version. |
 | **Voyage AI** (via the Atlas model API) | Embeddings for every candidate and every promoted lesson. |
 | **ElevenLabs Agents** | Voice support line. Caller speech is untrusted input — the realistic poisoning channel. The voice agent uses Notary's endpoint as its custom LLM, so the agent on the phone is exactly the agent the gate tests. |
 | **OpenAI** | Refund agent (gpt-4.1), proposer (gpt-5.5), background extractor (gpt-4.1-mini). |

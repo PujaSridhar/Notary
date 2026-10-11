@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import time
 import uuid
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
@@ -13,6 +14,9 @@ from .grader import grade
 from .taskgen import TODAY, order_from_doc
 
 
+_LESSON_CACHE: dict = {}
+
+
 def active_lessons() -> tuple[int, list[str]]:
     d = db()
     state = d.memory_state.find_one({"_id": "state"}) or {"active_version": 0}
@@ -21,11 +25,15 @@ def active_lessons() -> tuple[int, list[str]]:
     fallback_texts = [r["text"] for r in version.get("rules", [])]
     if not fallback_texts:
         return ver_num, []
+    cached = _LESSON_CACHE.get(ver_num)
+    if cached and time.time() - cached[0] < 30:  # per-version cache: a rollback changes the key immediately
+        return ver_num, cached[1]
     try:
         from .memory import store
         active_ids = [r["candidate_id"] for r in version.get("rules", [])]
         lessons = store().lessons_for("refund", active_ids)
         if lessons:
+            _LESSON_CACHE[ver_num] = (time.time(), lessons)
             return ver_num, lessons
     except Exception:
         pass
