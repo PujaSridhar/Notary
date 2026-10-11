@@ -1,0 +1,53 @@
+# Project-level settings for a memory-only project.
+# memory_only: true tells agentengine dev up to start only OE and memory-server.
+memory_only: true
+
+memory:
+  # Memory-server log level. One of: debug | info | warning | error | critical.
+  log_level: info
+
+  # Voyage AI embeddings.
+  # The Voyage API key is NOT set here — upload it as a project secret with:
+  #   agentengine secret set VOYAGE_API_KEY <value>
+  voyage:
+    model: "voyage-4-large"
+    dimension: 1024
+
+  # LLM the memory server uses for background extraction.
+  # Agents can use a different provider/model.
+  # After changing it, run:
+  #   agentengine memory configure && agentengine memory apply
+  # The API key is NOT set here. Upload it as a project secret:
+  #   agentengine secret set LLM_API_KEY --sync
+  extraction_llm:
+    provider: openai             # REQUIRED. One of: openai | anthropic | gemini | cerebras
+    model: gpt-4.1-mini          # REQUIRED. The exact model ID your provider or gateway serves
+    api_key_secret: OPENAI_API_KEY  # REQUIRED. Project secret holding the key. One of: LLM_API_KEY |
+                                 # OPENAI_API_KEY | ANTHROPIC_API_KEY | GEMINI_API_KEY | CEREBRAS_API_KEY
+    base_url: null               # REQUIRED for a gateway or compatible endpoint. Leave null for the
+                                 # provider's public API
+    auth_header: null            # REQUIRED for a gateway that doesn't use the provider's default
+                                 # header. One of: api-key | authorization
+
+  background_extraction:
+    # Snapshot promotion
+    snapshot:
+      max_messages: 20
+      stale_minutes: 1
+
+  # Extraction pipeline. The 'enabled' list below selects which memory types are
+  # extracted in the background; it ships with a sensible default set. Edit the
+  # list to add or remove types, or set it to [] to turn extraction off entirely.
+  # Valid types: semantic, episodic, taxonomic, preferences, procedural.
+  # Each type may also take an optional 'prompt' to override the system default, e.g.
+  #   semantic:
+  #     prompt: "..."
+  # NOTE: removing the 'enabled' line entirely falls back to the server default;
+  # keep an explicit list (or []) to control exactly which types run.
+  # NOTARY: procedural memory is deliberately NOT extracted in the background.
+  # The Notary gate is the only writer to procedural memory (save_procedure on promotion).
+  # Facts and episodes may still be extracted automatically.
+  extraction:
+    enabled:
+      - semantic
+      - episodic

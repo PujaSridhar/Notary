@@ -9,3 +9,4 @@ openai
 anthropic
 voyageai
 elevenlabs
+# agent-engine-sdk-memory  (install from Agent Engine's private index, see README)
