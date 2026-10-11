@@ -322,3 +322,43 @@ async def voice_llm(request: Request):
 def recent_calls(limit: int = 8):
     calls = list(db().calls.find({}, {"decisions": 0}).sort("updated_at", -1).limit(limit))
     return _jsonable(calls)
+
+
+# ---------------------------------------------------------------------------------------------
+# Demo stories and audit export (read-only).
+# ---------------------------------------------------------------------------------------------
+DEMO_ROLES = ["improvement", "loophole", "overgeneralized", "poisoned", "organic_poison"]
+
+
+@app.get("/api/demo")
+def demo():
+    """Story data for the guided demo: each tagged candidate with its most rigorous latest evaluation."""
+    d = db()
+    roles = {}
+    for role in DEMO_ROLES:
+        c = d.candidates.find_one({"demo_role": role})
+        if c is None:
+            continue
+        ev = d.eval_runs.find_one({"candidate_id": c["_id"]}, sort=[("k", -1), ("created_at", -1)])
+        ungated = d.traces.count_documents({"run_id": f"ungated-{c['_id']}"})
+        roles[role] = {"candidate": c, "eval": ev, "ungated_runs": ungated}
+    st = d.memory_state.find_one({"_id": "state"})
+    return _jsonable({"roles": roles, "active_version": st["active_version"],
+                      "versions": list(d.rule_versions.find().sort("_id", 1))})
+
+
+@app.get("/api/audit/export")
+def audit_export():
+    """Full JSON export of Notary's governance record: versions, candidates, evaluations, audit log."""
+    d = db()
+    st = d.memory_state.find_one({"_id": "state"})
+    body = _jsonable({
+        "exported_at": now(),
+        "database": d.name,
+        "active_version": st["active_version"],
+        "rule_versions": list(d.rule_versions.find().sort("_id", 1)),
+        "candidates": list(d.candidates.find().sort("created_at", 1)),
+        "eval_runs": list(d.eval_runs.find().sort("created_at", 1)),
+        "audit_log": list(d.audit_log.find().sort("ts", 1)),
+    })
+    return JSONResponse(body, headers={"Content-Disposition": 'attachment; filename="notary-audit-export.json"'})
