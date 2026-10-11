@@ -61,10 +61,14 @@ A full gate run (k=1) takes ~1–1.5 min and ~150 agent calls; `--quick` ~30 s.
 ## Current status (update this when you change things)
 - ✅ Core loop works end to end; verdicts verified (see README results table).
 - ✅ Review page + chat + ungated comparison; voice endpoint tested; ElevenLabs agent created (talk link via `scripts/voice_agent.py`).
+- ✅ Real voice call test verified live with ElevenLabs and recorded into Atlas `calls`.
+- ✅ UI polished (`notary/static/index.html`) with visual pipeline banner, delta badges, and before/after comparisons.
+- ✅ Unit test suite expanded (`tests/test_gate_mock.py`) covering gate logic, margins, and atomic transactions.
+- ✅ README updated with Mermaid architecture diagram and 2-minute judge pitch script.
 - ⏳ Agent Engine memory server: provisioning was blocked by a rejected Voyage key; promotion falls back to Atlas
   automatically until it is ready (check `agentengine memory status --context notary`).
 - ⏳ Not yet done: k=3 reruns for final numbers; re-run the organic gold-tier poisoning under the untrusted rule;
-  real voice call test; Raindrop signals (optional); deploy on Modelence (optional).
+  Raindrop signals (optional); deploy on Modelence (optional).
 
 ## Good tasks for a second agent (low conflict)
 - **UI polish** in `notary/static/index.html` only: clearer verdict cards, a before/after diff view, a short
