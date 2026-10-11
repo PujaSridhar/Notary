@@ -105,6 +105,12 @@
       <div class="status" id="chatStatus"></div>
     </section>
     <section>
+      <h2>Recent conversations</h2>
+      <p class="sub">Web chat and voice calls. Run background extraction on any of them; the gate decides what becomes memory.</p>
+      <div id="calls"></div>
+      <div class="status" id="callStatus"></div>
+    </section>
+    <section>
       <h2>Trusted memory versions</h2>
       <p class="sub">Only the gate writes here. Rollback changes which version is served; nothing is deleted.</p>
       <div class="versions" id="versions"></div>
@@ -172,7 +178,16 @@ function renderCand(c) {
   return `<div class="card"><div class="top">${badge(c.status)}<div><div class="lesson">${esc(c.text)}</div>
     <div class="prov">${trust} · ${by} · k=${ev ? ev.k : "–"}${ev && ev.quick ? " · quick" : ""}</div></div></div>${table}${reasons}${ung}</div>`;
 }
+async function refreshCalls() {
+  const calls = await api("/api/calls");
+  $("calls").innerHTML = calls.length ? calls.map(c => {
+    const last = (c.messages || []).slice(-2).map(m => `<b>${esc(m.role)}:</b> ${esc(m.content)}`).join("<br>");
+    return `<div class="card"><div class="prov">${esc(c.channel)} · ${esc(c.conversation_id)}</div><div style="font-size:13px;margin-top:4px">${last}</div>
+      <div class="row"><button class="secondary" data-extract="${esc(c.conversation_id)}">Extract lesson → run gate</button></div></div>`;
+  }).join("") : `<p class="sub">No conversations yet.</p>`;
+}
 async function refresh() {
+  refreshCalls();
   const s = await api("/api/state");
   $("active").textContent = `active memory: v${s.active_version}`;
   $("cands").innerHTML = s.candidates.length ? s.candidates.map(renderCand).join("") : `<p class="sub">No candidates yet.</p>`;
@@ -184,7 +199,16 @@ async function refresh() {
   $("audit").innerHTML = s.audit.map(a => `<div>${esc(a.ts.slice(11, 19))} ${esc(a.event)}${a.version != null ? " v" + a.version : ""}</div>`).join("");
 }
 document.addEventListener("click", async (e) => {
-  const rb = e.target.dataset.rollback, ug = e.target.dataset.ungated;
+  const rb = e.target.dataset.rollback, ug = e.target.dataset.ungated, ex = e.target.dataset.extract;
+  if (ex) {
+    e.target.disabled = true;
+    try {
+      const { job_id } = await api(`/api/calls/${ex}/extract-and-gate`, { method: "POST" });
+      const r = await waitJob(job_id, $("callStatus"), "Extracting a lesson and running the gate");
+      $("callStatus").textContent = `Extracted: “${r.candidate.text}” → ${r.eval.verdict}`;
+      refresh();
+    } catch (err) { $("callStatus").textContent = err.message; }
+  }
   if (rb !== undefined) { await api("/api/rollback", { method: "POST", body: JSON.stringify({ version: Number(rb) }) }); refresh(); }
   if (ug) {
     e.target.disabled = true;

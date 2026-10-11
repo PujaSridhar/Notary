@@ -179,3 +179,91 @@ class RollbackIn(BaseModel):
 @app.post("/api/rollback")
 def do_rollback(body: RollbackIn):
     return _jsonable(rollback(body.version))
+
+
+# ---------------------------------------------------------------------------------------------
+# Voice channel (ElevenLabs Agents). ElevenLabs calls this as its custom LLM. Same agent_turn().
+# ---------------------------------------------------------------------------------------------
+import asyncio  # noqa: E402
+import hashlib  # noqa: E402
+import json as _json  # noqa: E402
+import os  # noqa: E402
+import time  # noqa: E402
+
+from fastapi import Request  # noqa: E402
+from fastapi.responses import JSONResponse, StreamingResponse  # noqa: E402
+from starlette.concurrency import run_in_threadpool  # noqa: E402
+
+PUBLIC_PATHS = ("/v1/chat/completions", "/webhooks/elevenlabs")
+
+
+@app.middleware("http")
+async def tunnel_guard(request: Request, call_next):
+    """Requests arriving through the public tunnel may only reach the voice endpoints."""
+    via_tunnel = "cf-connecting-ip" in request.headers or "x-forwarded-for" in request.headers
+    if via_tunnel and not request.url.path.startswith(PUBLIC_PATHS):
+        return JSONResponse({"error": "not available over the public tunnel"}, status_code=403)
+    if request.url.path.startswith("/v1/"):
+        token = os.environ.get("NOTARY_VOICE_TOKEN", "")
+        if not token or request.headers.get("x-notary-token") != token:
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+    return await call_next(request)
+
+
+def _voice_conversation_id(messages: list[dict]) -> str:
+    """ElevenLabs sends the full history each turn; key the call on its opening turns."""
+    opening = [m for m in messages if m.get("role") in ("assistant", "user")][:2]
+    return "voice-" + hashlib.sha1(_json.dumps(opening, sort_keys=True).encode()).hexdigest()[:12]
+
+
+def _voice_turn(messages: list[dict]) -> str:
+    turns = [m for m in messages if m.get("role") in ("user", "assistant") and isinstance(m.get("content"), str)]
+    latest = next((m["content"] for m in reversed(turns) if m["role"] == "user"), "")
+    history = "\n".join(f"{'customer' if m['role'] == 'user' else 'agent'}: {m['content']}" for m in turns[:-1])
+    prompt = (f"(Phone call. Conversation so far:\n{history}\n)\nCustomer now says: {latest}\n"
+              "If you need an order number, ask for it in one short sentence.") if history else latest
+    version, lessons = active_lessons()
+    loop, final = agent_turn(prompt, lessons)
+    reply = _reply_text(final, loop)
+    conv = _voice_conversation_id(messages)
+    transcript = [{"role": "customer" if m["role"] == "user" else "agent", "content": m["content"]} for m in turns]
+    transcript.append({"role": "agent", "content": reply})
+    db().calls.update_one(
+        {"conversation_id": conv},
+        {"$setOnInsert": {"conversation_id": conv, "channel": "voice", "created_at": now()},
+         "$set": {"messages": transcript, "updated_at": now()},
+         "$push": {"decisions": {"rules_version": version, "final": final, "tool_calls": loop.tool_calls}}},
+        upsert=True)
+    return reply
+
+
+def _sse(text: str, model: str) -> str:
+    chunk = {"id": "chatcmpl-notary", "object": "chat.completion.chunk", "created": int(time.time()),
+             "model": model, "choices": [{"index": 0, "delta": {"content": text}, "finish_reason": None}]}
+    return f"data: {_json.dumps(chunk)}\n\n"
+
+
+@app.post("/v1/chat/completions")
+async def voice_llm(request: Request):
+    body = await request.json()
+    model = body.get("model", "notary")
+    messages = body.get("messages", [])
+    latest = next((m.get("content") or "" for m in reversed(messages) if m.get("role") == "user"), "")
+
+    async def stream():
+        if any(ch.isdigit() for ch in str(latest)):
+            yield _sse("One moment, let me check that order... ", model)  # buffer words mask lookup latency
+        try:
+            reply = await asyncio.wait_for(run_in_threadpool(_voice_turn, messages), timeout=25)
+        except Exception:
+            reply = "Sorry, I'm having trouble checking that right now. Could you say the order number again?"
+        yield _sse(reply, model)
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+@app.get("/api/calls")
+def recent_calls(limit: int = 8):
+    calls = list(db().calls.find({}, {"decisions": 0}).sort("updated_at", -1).limit(limit))
+    return _jsonable(calls)
