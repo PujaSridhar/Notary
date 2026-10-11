@@ -10,8 +10,8 @@ from .policy import APPROVE, DENY, ESCALATE, Order, invariant_violations
 # Which task categories a failure category points at. The gate uses this to choose the
 # heldout target categories from the failure cluster, never from the candidate's own claim.
 FAILURE_TARGETS: dict[str, list[str]] = {
-    "approved_outside_window": ["out_of_window", "gold_out_of_window", "defective_too_late"],
-    "denied_valid_refund": ["in_window", "date_mismatch", "defective_exception"],
+    "approved_outside_window": ["out_of_window", "gold_out_of_window", "defective_too_late", "boundary_days"],
+    "denied_valid_refund": ["in_window", "date_mismatch", "defective_exception", "boundary_days"],
     "approved_final_sale": ["final_sale"],
     "approved_undelivered": ["undelivered"],
     "should_escalate": ["undelivered"],
@@ -20,7 +20,7 @@ FAILURE_TARGETS: dict[str, list[str]] = {
     "no_decision": [],
 }
 DEFAULT_TARGETS = ["in_window", "date_mismatch", "out_of_window", "gold_out_of_window",
-                   "defective_exception", "defective_too_late"]
+                   "defective_exception", "defective_too_late", "boundary_days"]
 
 
 @dataclass
